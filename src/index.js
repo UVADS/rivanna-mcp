@@ -1,4 +1,5 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
@@ -59,7 +60,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
-    const { name, arguments: args } = request;
+    const { name, arguments: args } = request.params || request;
 
     switch (name) {
       case 'get_job_status':
@@ -166,7 +167,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
-  const transport = new server.StdioServerTransport();
+  const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('Rivanna MPC server started');
 }
