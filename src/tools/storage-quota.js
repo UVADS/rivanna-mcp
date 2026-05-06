@@ -1,39 +1,61 @@
 export async function getStorageQuota(sshClient, options = {}) {
-  const { filesystem } = options;
+  // Get current username
+  const usernameOutput = await sshClient.exec('whoami');
+  const username = usernameOutput.trim();
 
-  // Use df for filesystem usage (quota command not available on Rivanna)
-  const output = await sshClient.exec('df -h');
-  const lines = output.trim().split('\n');
+  // Check user storage locations
+  const storageLocations = [
+    {
+      name: 'Home Storage (GPFS)',
+      path: `/home/${username}`,
+      type: 'home',
+    },
+    {
+      name: 'Scratch Storage (Weka)',
+      path: `/sfs/weka/scratch/${username}`,
+      type: 'scratch',
+    },
+  ];
 
-  // Skip header line
-  const filesystems = lines.slice(1).map(line => {
-    const parts = line.split(/\s+/);
-    return {
-      filesystem: parts[0],
-      size: parts[1],
-      used: parts[2],
-      available: parts[3],
-      percent: parts[4],
-      mount: parts[5],
-    };
-  }).filter(fs => fs.filesystem && fs.filesystem !== 'Filesystem');
+  // Get usage for each location
+  const quotas = [];
+  for (const loc of storageLocations) {
+    try {
+      // Use du to get total usage, -s for summary, -h for human readable
+      const usage = await sshClient.exec(`du -sh "${loc.path}" 2>/dev/null || echo "N/A"`);
+      const usageStr = usage.trim().split('\t')[0];
 
-  // Filter main storage areas
-  const storageFs = filesystems.filter(fs =>
-    !fs.filesystem.startsWith('tmp') &&
-    !fs.filesystem.includes('/run') &&
-    !fs.filesystem.includes('loop') &&
-    fs.mount && (fs.mount.startsWith('/') || fs.mount.includes('sfs'))
-  );
+      // Get available space on the filesystem
+      const dfOutput = await sshClient.exec(`df -h "${loc.path}" 2>/dev/null | tail -1`);
+      const dfParts = dfOutput.trim().split(/\s+/);
 
-  let result = storageFs;
-  if (filesystem) {
-    result = storageFs.filter((q) => q.filesystem.includes(filesystem) || q.mount.includes(filesystem));
+      quotas.push({
+        name: loc.name,
+        path: loc.path,
+        type: loc.type,
+        usage: usageStr,
+        total: dfParts[1] || 'N/A',
+        available: dfParts[3] || 'N/A',
+        percentUsed: dfParts[4] || '0%',
+      });
+    } catch (e) {
+      quotas.push({
+        name: loc.name,
+        path: loc.path,
+        type: loc.type,
+        usage: 'N/A',
+        total: 'N/A',
+        available: 'N/A',
+        percentUsed: 'N/A',
+        error: 'Could not access storage',
+      });
+    }
   }
 
   return {
     success: true,
-    filesystems: result,
+    username,
+    quotas,
   };
 }
 
