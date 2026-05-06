@@ -8,6 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import SSHClient from './ssh-client.js';
 import { loadConfig } from './config.js';
+import { initializeLogger, logRequest, logError, logSuccess } from './logger.js';
 import { getJobStatus, jobStatusTool } from './tools/job-status.js';
 import {
   getNodeResources,
@@ -27,9 +28,11 @@ import {
 } from './tools/allocation-billing.js';
 
 const config = loadConfig();
+initializeLogger(config);
 const HPC_HOST = 'login.hpc.virginia.edu';
 const HPC_USER = config.computingId;
 const HPC_KEY = config.sshKeyPath;
+const loggingEnabled = config.logging !== false;
 
 const sshClient = new SSHClient(HPC_HOST, HPC_USER, HPC_KEY);
 
@@ -62,90 +65,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const { name, arguments: args } = request.params || request;
 
+    logRequest(name, args, loggingEnabled);
+
+    let result;
     switch (name) {
       case 'get_job_status':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getJobStatus(sshClient, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getJobStatus(sshClient, args);
+        break;
 
       case 'get_node_resources':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getNodeResources(sshClient, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getNodeResources(sshClient, args);
+        break;
 
       case 'get_storage_quota':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getStorageQuota(sshClient, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getStorageQuota(sshClient, args);
+        break;
 
       case 'get_directory_usage':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getDirectoryUsage(sshClient, args.path),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getDirectoryUsage(sshClient, args.path);
+        break;
 
       case 'get_allocation_info':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getAllocationInfo(sshClient, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getAllocationInfo(sshClient, args);
+        break;
 
       case 'get_job_accounting':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await getJobAccounting(sshClient, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        result = await getJobAccounting(sshClient, args);
+        break;
 
       default:
         throw new McpError(
@@ -153,7 +99,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `Unknown tool: ${name}`
         );
     }
+
+    logSuccess(name, loggingEnabled);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
   } catch (error) {
+    const { name } = request.params || request;
+    logError(name, error, loggingEnabled);
+
     return {
       content: [
         {

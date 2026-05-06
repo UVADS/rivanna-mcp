@@ -79,6 +79,12 @@ export async function runSetup() {
       default: join(homedir(), '.ssh/id_rsa'),
       validate: validateSSHKey,
     },
+    {
+      type: 'confirm',
+      name: 'logging',
+      message: 'Enable logging of MCP interactions to ~/.rivanna-mcp/history.log?',
+      default: true,
+    },
   ]);
 
   // Test the SSH connection
@@ -116,6 +122,7 @@ export async function runSetup() {
     computingId: answers.computingId,
     sshKeyPath: expandPath(answers.sshKeyPath),
     hpcHost: HPC_HOST,
+    logging: answers.logging,
     createdAt: new Date().toISOString(),
   };
 
@@ -132,6 +139,7 @@ export async function runSetup() {
   console.log(`   Computing ID: ${config.computingId}`);
   console.log(`   SSH Key: ${config.sshKeyPath}`);
   console.log(`   HPC Host: ${config.hpcHost}`);
+  console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
   console.log(`\n🔐 SSH Connection: Connected as ${testResult.username}`);
   console.log(
     `\n🚀 You can now use the MCP server. It will be available for Claude Code integration.\n`
