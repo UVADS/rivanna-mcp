@@ -1,0 +1,10 @@
+.github/
+.gitignore
+.editorconfig
+.vscode/
+.idea/
+.DS_Store
+.env
+.env.local
+npm-debug.log*
+*.log

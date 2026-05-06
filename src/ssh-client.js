@@ -1,85 +1,62 @@
-import { Client } from 'ssh2';
-import { readFileSync } from 'fs';
+import { spawn } from 'child_process';
 
 class SSHClient {
   constructor(host, username, privateKeyPath) {
     this.host = host;
     this.username = username;
     this.privateKeyPath = privateKeyPath;
-    this.conn = null;
-  }
-
-  async connect() {
-    if (this.conn) return;
-
-    return new Promise((resolve, reject) => {
-      const client = new Client();
-      const privateKey = readFileSync(this.privateKeyPath);
-
-      client.on('ready', () => {
-        this.conn = client;
-        resolve();
-      });
-
-      client.on('error', reject);
-      client.on('close', () => {
-        this.conn = null;
-      });
-
-      client.connect({
-        host: this.host,
-        username: this.username,
-        privateKey,
-        readyTimeout: 30000,
-      });
-    });
   }
 
   async exec(command, timeout = 30000) {
-    if (!this.conn) {
-      await this.connect();
-    }
+    const args = [
+      '-i', this.privateKeyPath,
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'UserKnownHostsFile=/dev/null',
+      '-o', 'BatchMode=yes',
+      '-o', 'KexAlgorithms=sntrup761x25519-sha512@openssh.com,curve25519-sha256,diffie-hellman-group14-sha256',
+      `${this.username}@${this.host}`,
+      command,
+    ];
 
     return new Promise((resolve, reject) => {
+      const proc = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+      let timedOut = false;
+
       const timeoutId = setTimeout(() => {
-        reject(new Error(`Command timed out after ${timeout}ms`));
+        timedOut = true;
+        proc.kill();
       }, timeout);
 
-      this.conn.exec(command, (err, stream) => {
-        if (err) {
-          clearTimeout(timeoutId);
-          reject(err);
-          return;
+      proc.stdout.on('data', (data) => {
+        stdout += data;
+      });
+
+      proc.stderr.on('data', (data) => {
+        stderr += data;
+      });
+
+      proc.on('close', (code) => {
+        clearTimeout(timeoutId);
+        if (timedOut) {
+          reject(new Error(`Command timed out after ${timeout}ms`));
+        } else if (code === 0) {
+          resolve(stdout);
+        } else {
+          reject(new Error(`SSH command failed: ${stderr || `exit code ${code}`}`));
         }
+      });
 
-        let stdout = '';
-        let stderr = '';
-
-        stream.on('close', (code, signal) => {
-          clearTimeout(timeoutId);
-          if (code === 0) {
-            resolve(stdout);
-          } else {
-            reject(new Error(`Command exited with code ${code}: ${stderr}`));
-          }
-        });
-
-        stream.on('data', (data) => {
-          stdout += data.toString();
-        });
-
-        stream.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
+      proc.on('error', (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
       });
     });
   }
 
   close() {
-    if (this.conn) {
-      this.conn.end();
-      this.conn = null;
-    }
+    // No persistent connection, nothing to close
   }
 }
 

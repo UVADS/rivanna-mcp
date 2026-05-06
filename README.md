@@ -21,7 +21,6 @@ rivanna-mcp setup
 This will prompt you for:
 - **Computing ID**: Your Rivanna username
 - **SSH Key Path**: Path to your SSH private key (default: `~/.ssh/id_rsa`)
-- **HPC Host**: Rivanna hostname (default: `rivanna.hpc.virginia.edu`)
 
 Configuration is saved to `~/.rivanna-mcp/config.json` and read automatically when the MCP starts.
 
@@ -109,7 +108,7 @@ Configuration is stored in `~/.rivanna-mcp/config.json`:
 {
   "computingId": "nmagee",
   "sshKeyPath": "/Users/nmagee/.ssh/id_rsa",
-  "hpcHost": "rivanna.hpc.virginia.edu",
+  "hpcHost": "login.hpc.virginia.edu",
   "createdAt": "2025-01-15T10:30:00.000Z"
 }
 ```
@@ -165,12 +164,12 @@ Verify the path to your SSH key is correct. By default, it should be at `~/.ssh/
 ### Connection timeout
 - Verify you're connected to the network that can reach Rivanna
 - Check that your SSH key is authorized on the cluster
-- Try connecting manually: `ssh -i /path/to/key username@rivanna.hpc.virginia.edu`
+- Try connecting manually: `ssh -i /path/to/key username@login.hpc.virginia.edu`
 
 ### SLURM command errors
 - Verify your computing ID is correct
 - Ensure SLURM tools are available on the cluster
-- Check cluster status at https://status.virginia.edu
+- Check cluster status at https://www.rc.virginia.edu
 
 ## Security
 

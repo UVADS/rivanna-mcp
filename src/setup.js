@@ -39,17 +39,13 @@ async function testSSHConnection(hpcHost, computingId, sshKeyPath) {
 
   try {
     console.log('\n⏳ Testing SSH connection...');
-    await sshClient.connect();
-
-    const output = await sshClient.exec('echo "Connection successful" && whoami');
-    sshClient.close();
+    const output = await sshClient.exec('whoami');
 
     return {
       success: true,
-      username: output.trim().split('\n').pop(),
+      username: output.trim(),
     };
   } catch (error) {
-    sshClient.close();
     return {
       success: false,
       error: error.message,
@@ -67,7 +63,7 @@ export async function runSetup() {
     {
       type: 'input',
       name: 'computingId',
-      message: 'Computing ID (Rivanna username)',
+      message: 'UVA computing ID (Rivanna username)',
       default: process.env.USER,
       validate: (input) => {
         if (!input.trim()) {
@@ -83,17 +79,12 @@ export async function runSetup() {
       default: join(homedir(), '.ssh/id_rsa'),
       validate: validateSSHKey,
     },
-    {
-      type: 'input',
-      name: 'hpcHost',
-      message: 'HPC cluster hostname',
-      default: 'rivanna.hpc.virginia.edu',
-    },
   ]);
 
   // Test the SSH connection
+  const HPC_HOST = 'login.hpc.virginia.edu';
   const testResult = await testSSHConnection(
-    answers.hpcHost,
+    HPC_HOST,
     answers.computingId,
     answers.sshKeyPath
   );
@@ -116,7 +107,7 @@ export async function runSetup() {
       '   • Ensure you are on the campus network or connected to VPN'
     );
     console.log(
-      '   • Try connecting manually: ssh -i ' + answers.sshKeyPath + ' ' + answers.computingId + '@' + answers.hpcHost + '\n'
+      '   • Try connecting manually: ssh -i ' + answers.sshKeyPath + ' ' + answers.computingId + '@' + HPC_HOST + '\n'
     );
     process.exit(1);
   }
@@ -124,7 +115,7 @@ export async function runSetup() {
   const config = {
     computingId: answers.computingId,
     sshKeyPath: expandPath(answers.sshKeyPath),
-    hpcHost: answers.hpcHost,
+    hpcHost: HPC_HOST,
     createdAt: new Date().toISOString(),
   };
 

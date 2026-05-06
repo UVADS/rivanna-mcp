@@ -26,22 +26,11 @@ import {
 } from './tools/allocation-billing.js';
 
 const config = loadConfig();
-const HPC_HOST = config.hpcHost;
+const HPC_HOST = 'login.hpc.virginia.edu';
 const HPC_USER = config.computingId;
 const HPC_KEY = config.sshKeyPath;
 
-let sshClient = null;
-
-async function ensureConnection() {
-  if (!sshClient) {
-    try {
-      sshClient = new SSHClient(HPC_HOST, HPC_USER, HPC_KEY);
-      await sshClient.connect();
-    } catch (error) {
-      throw new Error(`Failed to connect to HPC cluster: ${error.message}`);
-    }
-  }
-}
+const sshClient = new SSHClient(HPC_HOST, HPC_USER, HPC_KEY);
 
 const server = new Server(
   {
@@ -70,8 +59,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
-    await ensureConnection();
-
     const { name, arguments: args } = request;
 
     switch (name) {
