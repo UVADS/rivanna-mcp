@@ -1,4 +1,4 @@
-# rivanna-mpc
+# Rivanna MCP
 
 An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with Claude Code to give AI access to your cluster status, jobs, resources, and allocations.
 
@@ -7,14 +7,14 @@ An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics 
 Install globally from GitHub:
 
 ```bash
-npm install -g github:uvads/rivanna-mpc
+npm install -g github:uvads/rivanna-mcp
 ```
 
 Or install locally for development:
 
 ```bash
-git clone https://github.com/uvads/rivanna-mpc.git
-cd rivanna-mpc
+git clone https://github.com/uvads/rivanna-mcp.git
+cd rivanna-mcp
 npm install
 ```
 
@@ -32,19 +32,19 @@ You'll be prompted for:
 - **Computing ID**: Your Rivanna username (e.g., `nem2p`)
 - **SSH Key Path**: Path to your SSH private key (e.g., `~/.ssh/nem2p_rivanna`)
 
-The wizard will test the SSH connection and save your configuration to `~/.rivanna-mpc/config.json`.
+The wizard will test the SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
 
 ### 2. Start the MCP Server
 
 ```bash
-rivanna-mpc
+rivanna-mcp
 ```
 
 The server will start and listen for MCP protocol requests. When integrated with Claude Code, it automatically manages the connection lifecycle.
 
 ### 3. Use in Claude Code
 
-Configure rivanna-mpc in your Claude Code environment to unlock HPC queries. Once connected, you'll have access to 6 tools for monitoring your cluster.
+Configure rivanna-mcp in your Claude Code environment to unlock HPC queries. Once connected, you'll have access to 6 tools for monitoring your cluster.
 
 ## Available Tools
 
@@ -120,7 +120,7 @@ get_job_accounting(user: "nem2p", days: 60)
 
 ## Configuration
 
-Configuration is automatically saved to `~/.rivanna-mpc/config.json`:
+Configuration is automatically saved to `~/.rivanna-mcp/config.json`:
 
 ```json
 {
@@ -138,7 +138,7 @@ To reconfigure, simply run `rivanna-mcp setup` again or edit the JSON file direc
 ```
 Claude Code
     ↓
-rivanna-mpc (MCP server)
+rivanna-mcp (MCP server)
     ↓ SSH
 Rivanna Login Node
     ↓
@@ -156,18 +156,18 @@ The MCP server:
 ### Local Setup
 
 ```bash
-git clone https://github.com/uvads/rivanna-mpc.git
-cd rivanna-mpc
+git clone https://github.com/uvads/rivanna-mcp.git
+cd rivanna-mcp
 npm install
 ```
 
 ### Configuration
 
-Create or edit `~/.rivanna-mpc/config.json` with your credentials:
+Create or edit `~/.rivanna-mcp/config.json` with your credentials:
 
 ```bash
-mkdir -p ~/.rivanna-mpc
-cat > ~/.rivanna-mpc/config.json << 'EOF'
+mkdir -p ~/.rivanna-mcp
+cat > ~/.rivanna-mcp/config.json << 'EOF'
 {
   "computingId": "your-username",
   "sshKeyPath": "/path/to/your/ssh/key",
@@ -258,7 +258,7 @@ This is expected if Rivanna hasn't upgraded to support post-quantum algorithms y
 
 - **SSH Keys**: Only stored locally in your filesystem
 - **Credentials**: Never transmitted outside SSH tunnels
-- **Configuration**: Stored locally in `~/.rivanna-mpc/` (not in git)
+- **Configuration**: Stored locally in `~/.rivanna-mcp/` (not in git)
 - **Best Practice**: Use SSH key-based authentication with a strong passphrase
 
 ## License
@@ -268,4 +268,28 @@ MIT
 ## Support & Contributions
 
 For issues, feature requests, or contributions:
-https://github.com/uvads/rivanna-mpc/issues
+https://github.com/uvads/rivanna-mcp/issues
+
+## Uninstalling
+
+ To completely uninstall rivanna-mcp and test a fresh install:                          
+                                         
+  1. Uninstall the global npm package:                                                   
+  npm uninstall -g rivanna-mcp
+                                                                                         
+  2. Remove the configuration directory:                    
+  rm -rf ~/.rivanna-mcp                                                                  
+                                                            
+  Then to test a fresh install:
+
+  # Install from GitHub
+  npm install -g github:uvads/rivanna-mcp                                                
+   
+  # Run setup wizard                                                                     
+  rivanna-mcp setup                                         
+
+  # Start the server
+  rivanna-mcp
+
+  This will give you a completely clean slate. The setup wizard will walk you through    
+  entering your credentials and testing the connection.

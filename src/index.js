@@ -35,7 +35,7 @@ const sshClient = new SSHClient(HPC_HOST, HPC_USER, HPC_KEY);
 
 const server = new Server(
   {
-    name: 'rivanna-mpc',
+    name: 'rivanna-mcp',
     version: '1.0.0',
   },
   {
@@ -169,7 +169,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Rivanna MPC server started');
+  console.error('Rivanna MCP server started');
 }
 
 main().catch((error) => {
