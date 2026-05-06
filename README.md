@@ -18,7 +18,7 @@ Some tools in this MCP:
 One command to install globally AND hook into Claude Code:
 
 ```bash
-npm install -g github:uvads/rivanna-mcp && mkdir -p .claude && node -e "const fs=require('fs'); const path='.claude/settings.json'; const config={mcpServers:{['rivanna-mcp']:{command:'rivanna-mcp',args:[]}}}; const existing=fs.existsSync(path)?JSON.parse(fs.readFileSync(path)):{}; fs.writeFileSync(path, JSON.stringify({...existing,...config},null,2));"
+npm install -g github:uvads/rivanna-mcp && claude mcp add rivanna-mcp -- npx -y rivanna-mcp
 ```
 
 Then run setup once:
