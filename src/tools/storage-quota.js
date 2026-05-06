@@ -1,46 +1,39 @@
 export async function getStorageQuota(sshClient, options = {}) {
   const { filesystem } = options;
 
-  let command = 'quota -s';
-
-  const output = await sshClient.exec(command);
+  // Use df for filesystem usage (quota command not available on Rivanna)
+  const output = await sshClient.exec('df -h');
   const lines = output.trim().split('\n');
 
-  const quotas = [];
-  let currentSection = null;
-
-  for (const line of lines) {
-    if (line.startsWith('Disk quotas')) {
-      currentSection = line.split(' ')[3];
-    } else if (
-      line.startsWith('/') ||
-      line.match(/^\s+\//)
-    ) {
-      const parts = line.split(/\s+/).filter((p) => p.length > 0);
-      if (parts.length >= 5) {
-        quotas.push({
-          filesystem: parts[0],
-          used: parts[1],
-          quota: parts[2],
-          limit: parts[3],
-          files: parts[4],
-          inodeQuota: parts[5],
-          type: currentSection,
-        });
-      }
-    }
-  }
-
-  if (filesystem) {
+  // Skip header line
+  const filesystems = lines.slice(1).map(line => {
+    const parts = line.split(/\s+/);
     return {
-      success: true,
-      quotas: quotas.filter((q) => q.filesystem.includes(filesystem)),
+      filesystem: parts[0],
+      size: parts[1],
+      used: parts[2],
+      available: parts[3],
+      percent: parts[4],
+      mount: parts[5],
     };
+  }).filter(fs => fs.filesystem && fs.filesystem !== 'Filesystem');
+
+  // Filter main storage areas
+  const storageFs = filesystems.filter(fs =>
+    !fs.filesystem.startsWith('tmp') &&
+    !fs.filesystem.includes('/run') &&
+    !fs.filesystem.includes('loop') &&
+    fs.mount && (fs.mount.startsWith('/') || fs.mount.includes('sfs'))
+  );
+
+  let result = storageFs;
+  if (filesystem) {
+    result = storageFs.filter((q) => q.filesystem.includes(filesystem) || q.mount.includes(filesystem));
   }
 
   return {
     success: true,
-    quotas,
+    filesystems: result,
   };
 }
 
