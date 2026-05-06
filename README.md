@@ -2,6 +2,15 @@
 
 An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with Claude Code to give AI access to your cluster status, jobs, resources, and allocations.
 
+Some tools in this MCP:
+
+- What are my current jobs in Rivanna?
+- Stop my job ID 1234567890.
+- How much storage have I used in Rivanna?
+- How many GPUs are available in the cluster?
+- Tell me about my allocations.
+- Give me the job history for user `mst3k` over the past `N` days.
+
 ## Installation
 
 ### Quick Install (with Claude Code Integration)
