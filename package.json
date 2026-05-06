@@ -1,0 +1,36 @@
+{
+  "name": "rivanna-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for querying Rivanna HPC cluster metrics and job information",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "rivanna-mcp": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "hpc",
+    "slurm",
+    "rivanna",
+    "cluster"
+  ],
+  "author": "UVA Data Science",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uvads/rivanna-mpc"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "inquirer": "^9.3.8",
+    "ssh2": "^1.15.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
