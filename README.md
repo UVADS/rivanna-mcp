@@ -4,13 +4,30 @@ An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics 
 
 ## Installation
 
+### Quick Install (with Claude Code Integration)
+
+One command to install globally AND hook into Claude Code:
+
+```bash
+npm install -g github:uvads/rivanna-mcp && mkdir -p .claude && node -e "const fs=require('fs'); const path='.claude/settings.json'; const config={mcpServers:{['rivanna-mcp']:{command:'rivanna-mcp',args:[]}}}; const existing=fs.existsSync(path)?JSON.parse(fs.readFileSync(path)):{}; fs.writeFileSync(path, JSON.stringify({...existing,...config},null,2));"
+```
+
+Then run setup once:
+```bash
+rivanna-mcp setup
+```
+
+### Standard Install
+
 Install globally from GitHub:
 
 ```bash
 npm install -g github:uvads/rivanna-mcp
 ```
 
-Or install locally for development:
+Then manually add to `.claude/settings.json` (see Configuration section below).
+
+### Local Install (for development)
 
 ```bash
 git clone https://github.com/uvads/rivanna-mcp.git
@@ -34,17 +51,67 @@ You'll be prompted for:
 
 The wizard will test the SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
 
-### 2. Start the MCP Server
+### 1b. (Optional) Skip Setup Wizard
+
+If you've already run setup, you can skip directly to step 2.
+
+### 2. Configure Claude Code Integration
+
+You have two options for integrating rivanna-mcp with Claude Code:
+
+#### Option A: Manual Server Management (Simple)
+
+Start the server in a terminal before using Claude Code:
 
 ```bash
 rivanna-mcp
 ```
 
-The server will start and listen for MCP protocol requests. When integrated with Claude Code, it automatically manages the connection lifecycle.
+The server will listen for MCP protocol requests from Claude Code. Keep this terminal running while you work.
+
+#### Option B: Automatic Server Management (Recommended)
+
+Configure rivanna-mcp in your project's `.claude/settings.json` to auto-start it:
+
+**For globally installed rivanna-mcp:**
+
+Create or edit `.claude/settings.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "rivanna-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+**For locally installed rivanna-mcp (in the project):**
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "node",
+      "args": ["/path/to/rivanna-mcp/src/index.js"]
+    }
+  }
+}
+```
+
+Replace `/path/to/rivanna-mcp` with the actual path to your rivanna-mcp directory (use absolute paths or `${PROJECT_ROOT}` for relative paths).
+
+**About the `args` field:**
+- The `"args": []` should remain empty—rivanna-mcp doesn't accept command-line arguments
+- All configuration is read from `~/.rivanna-mcp/config.json` created by the setup wizard
+- If you need to reconfigure, just run `rivanna-mcp setup` again
+
+With this configuration, Claude Code will automatically start the MCP server when needed and manage its lifecycle.
 
 ### 3. Use in Claude Code
 
-Configure rivanna-mcp in your Claude Code environment to unlock HPC queries. Once connected, you'll have access to 6 tools for monitoring your cluster.
+Once configured (either running manually or via settings.json), you'll have access to 6 tools for monitoring your Rivanna cluster directly from Claude Code queries.
 
 ## Available Tools
 
@@ -132,6 +199,35 @@ Configuration is automatically saved to `~/.rivanna-mcp/config.json`:
 ```
 
 To reconfigure, simply run `rivanna-mcp setup` again or edit the JSON file directly.
+
+### Claude Code Integration
+
+To automatically start rivanna-mcp when using Claude Code, add it to your project's `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "rivanna-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+Claude Code will now:
+- Automatically start the rivanna-mcp server when you begin a session
+- Manage the server lifecycle (no manual terminal needed)
+- Provide access to all 6 HPC tools in your prompts
+
+**Benefits:**
+- One less terminal to manage
+- Server starts automatically with your project
+- Cleaner workflow within Claude Code
+
+**Requirements:**
+- rivanna-mcp must be installed globally (`npm install -g github:uvads/rivanna-mcp`)
+- Configuration from `rivanna-mcp setup` must exist at `~/.rivanna-mcp/config.json`
 
 ## Architecture
 
