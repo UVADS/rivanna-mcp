@@ -1,4 +1,4 @@
-# rivanna-mcp
+# rivanna-mpc
 
 An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with Claude Code to give AI access to your cluster status, jobs, resources, and allocations.
 
@@ -7,182 +7,265 @@ An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics 
 Install globally from GitHub:
 
 ```bash
-npm install -g github:uvads/rivanna-mcp
+npm install -g github:uvads/rivanna-mpc
 ```
 
-## Setup
+Or install locally for development:
 
-After installation, run the setup wizard:
+```bash
+git clone https://github.com/uvads/rivanna-mpc.git
+cd rivanna-mpc
+npm install
+```
+
+## Quick Start
+
+### 1. Run Setup Wizard
+
+After installation, configure your Rivanna connection:
 
 ```bash
 rivanna-mcp setup
 ```
 
-This will prompt you for:
-- **Computing ID**: Your Rivanna username
-- **SSH Key Path**: Path to your SSH private key (default: `~/.ssh/id_rsa`)
+You'll be prompted for:
+- **Computing ID**: Your Rivanna username (e.g., `nem2p`)
+- **SSH Key Path**: Path to your SSH private key (e.g., `~/.ssh/nem2p_rivanna`)
 
-Configuration is saved to `~/.rivanna-mcp/config.json` and read automatically when the MCP starts.
+The wizard will test the SSH connection and save your configuration to `~/.rivanna-mpc/config.json`.
 
-## Usage with Claude Code
+### 2. Start the MCP Server
 
-Once set up, the MCP server can be configured in Claude Code to provide tools for querying your Rivanna cluster.
+```bash
+rivanna-mpc
+```
 
-### Available Tools
+The server will start and listen for MCP protocol requests. When integrated with Claude Code, it automatically manages the connection lifecycle.
 
-#### `get_job_status`
-Query SLURM job queue. Filter by state, user, and limit results.
+### 3. Use in Claude Code
+
+Configure rivanna-mpc in your Claude Code environment to unlock HPC queries. Once connected, you'll have access to 6 tools for monitoring your cluster.
+
+## Available Tools
+
+### `get_job_status`
+Query the SLURM job queue with flexible filtering.
 
 **Parameters:**
-- `state` (optional): Job state filter - `all`, `RUNNING`, `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED`
-- `user` (optional): Filter by username
-- `limit` (optional, default: 100): Maximum jobs to return
+- `state` (string, optional): Filter by job state: `all`, `RUNNING`, `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED` (default: `all`)
+- `user` (string, optional): Filter by username
+- `limit` (number, optional): Maximum number of jobs to return (default: 100)
 
-**Example:** Get your running jobs
+**Example:**
 ```
 get_job_status(state: "RUNNING", limit: 50)
 ```
 
-#### `get_node_resources`
+### `get_node_resources`
 Get available compute nodes and their resource status.
 
 **Parameters:**
-- `partition` (optional): Filter by partition name
-- `detailed` (optional, default: false): Include detailed per-node info and summary
+- `partition` (string, optional): Filter by partition name (e.g., `gpu`, `standard`)
+- `detailed` (boolean, optional): Include detailed per-node information and cluster summary (default: false)
 
-**Example:** Get GPU node availability
+**Example:**
 ```
 get_node_resources(partition: "gpu", detailed: true)
 ```
 
-#### `get_storage_quota`
-Check filesystem quotas across mounted filesystems.
+### `get_storage_quota`
+Check filesystem quotas across all mounted filesystems.
 
 **Parameters:**
-- `filesystem` (optional): Filter by filesystem path
+- `filesystem` (string, optional): Filter by filesystem path (e.g., `/home`, `/scratch`)
 
-**Example:** Check home directory quota
+**Example:**
 ```
 get_storage_quota(filesystem: "/home")
 ```
 
-#### `get_directory_usage`
+### `get_directory_usage`
 Get disk usage for a specific directory.
 
 **Parameters:**
-- `path` (optional, default: current directory): Directory path to check
+- `path` (string, optional): Directory path to check (default: current directory)
 
-**Example:** Check data directory size
+**Example:**
 ```
-get_directory_usage(path: "/home/nmagee/data")
+get_directory_usage(path: "/home/nem2p/data")
 ```
 
-#### `get_allocation_info`
+### `get_allocation_info`
 View resource allocation limits for users and accounts.
 
 **Parameters:**
-- `user` (optional): Filter by username
+- `user` (string, optional): Filter by username
 
-**Example:** Check your allocation limits
+**Example:**
 ```
-get_allocation_info(user: "nmagee")
+get_allocation_info(user: "nem2p")
 ```
 
-#### `get_job_accounting`
+### `get_job_accounting`
 Get job accounting and compute hour usage over a time period.
 
 **Parameters:**
-- `user` (optional): Filter by username
-- `days` (optional, default: 30): Number of days to look back
+- `user` (string, optional): Filter by username
+- `days` (number, optional): Number of days to look back (default: 30)
 
-**Example:** Check compute hours used in the last 60 days
+**Example:**
 ```
-get_job_accounting(user: "nmagee", days: 60)
+get_job_accounting(user: "nem2p", days: 60)
 ```
 
-## Configuration File
+## Configuration
 
-Configuration is stored in `~/.rivanna-mcp/config.json`:
+Configuration is automatically saved to `~/.rivanna-mpc/config.json`:
 
 ```json
 {
-  "computingId": "nmagee",
-  "sshKeyPath": "/Users/nmagee/.ssh/id_rsa",
+  "computingId": "nem2p",
+  "sshKeyPath": "/Users/username/.ssh/nem2p_rivanna",
   "hpcHost": "login.hpc.virginia.edu",
-  "createdAt": "2025-01-15T10:30:00.000Z"
+  "createdAt": "2026-05-06T00:00:00.000Z"
 }
 ```
 
-You can edit this file manually if needed, but `rivanna-mcp setup` is the recommended approach.
+To reconfigure, simply run `rivanna-mcp setup` again or edit the JSON file directly.
+
+## Architecture
+
+```
+Claude Code
+    ↓
+rivanna-mpc (MCP server)
+    ↓ SSH
+Rivanna Login Node
+    ↓
+SLURM (squeue, sinfo, sacct, etc.)
+```
+
+The MCP server:
+1. Spawns native SSH processes for each command execution
+2. Parses SLURM command output into structured data
+3. Returns results via the MCP protocol
+4. Supports post-quantum key exchange algorithms for enhanced security
 
 ## Development
 
-Clone and set up locally:
+### Local Setup
 
 ```bash
-git clone https://github.com/uvads/rivanna-mcp.git
-cd rivanna-mcp
+git clone https://github.com/uvads/rivanna-mpc.git
+cd rivanna-mpc
 npm install
-npm run dev
 ```
 
-Run the setup wizard:
+### Configuration
+
+Create or edit `~/.rivanna-mpc/config.json` with your credentials:
+
+```bash
+mkdir -p ~/.rivanna-mpc
+cat > ~/.rivanna-mpc/config.json << 'EOF'
+{
+  "computingId": "your-username",
+  "sshKeyPath": "/path/to/your/ssh/key",
+  "hpcHost": "login.hpc.virginia.edu",
+  "createdAt": "2026-05-06T00:00:00.000Z"
+}
+EOF
+```
+
+### Run Server
+
+```bash
+npm start          # Production mode
+npm run dev        # Development mode with auto-reload
+```
+
+### Run Setup Wizard
 
 ```bash
 node src/cli.js setup
 ```
 
-Start the MCP server:
+## Post-Quantum Cryptography
 
-```bash
-npm start
+This MCP server attempts to use post-quantum hybrid key exchange algorithms when connecting to Rivanna:
+
+- **Primary**: `sntrup761x25519-sha512@openssh.com` (hybrid post-quantum)
+- **Fallback 1**: `curve25519-sha256` (modern, widely supported)
+- **Fallback 2**: `diffie-hellman-group14-sha256` (older but compatible)
+
+### Post-Quantum Warning
+
+You may see this warning:
+
+```
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded.
 ```
 
-## How It Works
-
-1. **SSH Connection**: Uses ssh2 library to connect to Rivanna via your configured SSH key
-2. **SLURM Commands**: Executes SLURM commands (`squeue`, `sinfo`, `sacct`, etc.) on the cluster
-3. **Output Parsing**: Parses cluster output and returns structured data
-4. **MCP Protocol**: Exposes results as MCP tools for Claude Code integration
-
-```
-Claude Code
-    ↓
-rivanna-mpc (local MCP server)
-    ↓ SSH
-Rivanna HPC Cluster (SLURM)
-```
+This indicates Rivanna's SSH server doesn't yet support post-quantum algorithms. The connection still works and is secure for current use, but Rivanna will eventually upgrade to post-quantum support. Your MCP client is already configured for it.
 
 ## Troubleshooting
 
 ### "Configuration not found"
-Run `rivanna-mcp setup` to create the configuration file.
 
-### "SSH key not found"
-Verify the path to your SSH key is correct. By default, it should be at `~/.ssh/id_rsa`.
+Run the setup wizard to create your configuration:
+
+```bash
+rivanna-mcp setup
+```
+
+### "SSH key not found" or "Permission denied"
+
+1. Verify your SSH key exists:
+   ```bash
+   ls -la ~/.ssh/your-key-name
+   ```
+
+2. Ensure it has correct permissions (should be `600`):
+   ```bash
+   chmod 600 ~/.ssh/your-key-name
+   ```
+
+3. Test the connection manually:
+   ```bash
+   ssh -i ~/.ssh/your-key-name username@login.hpc.virginia.edu whoami
+   ```
 
 ### Connection timeout
-- Verify you're connected to the network that can reach Rivanna
-- Check that your SSH key is authorized on the cluster
-- Try connecting manually: `ssh -i /path/to/key username@login.hpc.virginia.edu`
+
+- Verify you're on the UVA network or connected to VPN
+- Confirm your SSH key is authorized on Rivanna
+- Check Rivanna's status: https://www.rc.virginia.edu
+- Try the manual SSH command above to isolate the issue
 
 ### SLURM command errors
-- Verify your computing ID is correct
-- Ensure SLURM tools are available on the cluster
-- Check cluster status at https://www.rc.virginia.edu
 
-## Security
+- Verify your computing ID is correct in the configuration
+- Ensure SLURM tools (`squeue`, `sinfo`, etc.) are available on the cluster
+- Check your Rivanna account status at the RC website
 
-- SSH key is read from your local filesystem only
-- No credentials are transmitted outside SSH connections
-- Configuration file is stored locally in `~/.rivanna-mpc/`
-- Recommended: Use SSH key-based authentication only (disable password auth)
+### Post-Quantum Algorithm Not Available
+
+This is expected if Rivanna hasn't upgraded to support post-quantum algorithms yet. The client will automatically fall back to secure alternatives. No action needed.
+
+## Security Considerations
+
+- **SSH Keys**: Only stored locally in your filesystem
+- **Credentials**: Never transmitted outside SSH tunnels
+- **Configuration**: Stored locally in `~/.rivanna-mpc/` (not in git)
+- **Best Practice**: Use SSH key-based authentication with a strong passphrase
 
 ## License
 
 MIT
 
-## Support
+## Support & Contributions
 
-For issues, questions, or contributions, visit:
-https://github.com/uvads/rivanna-mcp/issues
+For issues, feature requests, or contributions:
+https://github.com/uvads/rivanna-mpc/issues
