@@ -26,6 +26,10 @@ import {
   allocationInfoTool,
   jobAccountingTool,
 } from './tools/allocation-billing.js';
+import {
+  getClusterUsage24h,
+  clusterUsage24hTool,
+} from './tools/usage-trends.js';
 
 const config = loadConfig();
 initializeLogger(config);
@@ -57,6 +61,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       directoryUsageTool,
       allocationInfoTool,
       jobAccountingTool,
+      clusterUsage24hTool,
     ],
   };
 });
@@ -91,6 +96,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_job_accounting':
         result = await getJobAccounting(sshClient, args);
+        break;
+
+      case 'get_cluster_usage_24h':
+        result = await getClusterUsage24h(sshClient, args);
         break;
 
       default:

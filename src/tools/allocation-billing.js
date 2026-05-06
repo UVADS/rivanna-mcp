@@ -3,10 +3,10 @@ import { parseSacctOutput } from '../utils.js';
 export async function getAllocationInfo(sshClient, options = {}) {
   const { user, days = 30 } = options;
 
-  let command = `sacctmgr show assoc format=cluster,account,user,maxcpus,maxmem,maxnode,maxwall,grpcpumins -p`;
+  let command = `sacctmgr show assoc format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
 
   if (user) {
-    command = `sacctmgr show assoc user=${user} format=cluster,account,user,maxcpus,maxmem,maxnode,maxwall,grpcpumins -p`;
+    command = `sacctmgr show assoc user=${user} format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
   }
 
   const output = await sshClient.exec(command);
@@ -22,10 +22,9 @@ export async function getAllocationInfo(sshClient, options = {}) {
       account: parts[1],
       user: parts[2],
       maxcpus: parts[3],
-      maxmemory: parts[4],
-      maxnode: parts[5],
-      maxwall: parts[6],
-      grpcpumins: parts[7],
+      maxnode: parts[4],
+      maxwall: parts[5],
+      grpcpumins: parts[6],
     };
   });
 
