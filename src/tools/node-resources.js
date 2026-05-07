@@ -10,45 +10,44 @@ export async function getNodeResources(sshClient, options = {}) {
     command = `scontrol show nodes all | grep -A 20 "Partitions=${partition}"`;
   }
 
-  try {
-    const output = await sshClient.exec(command);
-    const nodeBlocks = output.split('NodeName=').filter((block) => block.trim().length > 0);
+  const output = await sshClient.exec(command);
+  const nodeBlocks = output.split('NodeName=').filter((block) => block.trim().length > 0);
 
-    const nodes = nodeBlocks.map((block) => {
-      const lines = block.split('\n');
-      const nodeLine = lines[0];
-      const nodename = nodeLine.split(/\s+/)[0];
+  const nodes = nodeBlocks.map((block) => {
+    const lines = block.split('\n');
+    const nodeLine = lines[0];
+    const nodename = nodeLine.split(/\s+/)[0];
 
-      // Extract fields from the block
-      let state = 'unknown';
-      let cpus = '0';
-      let memory = '0';
-      let features = '';
+    // Extract fields from the block
+    let state = 'unknown';
+    let cpus = '0';
+    let memory = '0';
+    let features = '';
 
-      lines.forEach((line) => {
-        if (line.includes('State=')) {
-          state = line.match(/State=([^\s,]+)/)?.[1] || state;
-        }
-        if (line.includes('CPUTot=')) {
-          cpus = line.match(/CPUTot=(\d+)/)?.[1] || cpus;
-        }
-        if (line.includes('RealMemory=')) {
-          memory = line.match(/RealMemory=(\d+)/)?.[1] || memory;
-        }
-        if (line.includes('Features=')) {
-          features = line.match(/Features=([^\s]*)/)?.[1] || features;
-        }
-      });
-
-      return {
-        nodename,
-        state,
-        cpus,
-        memory,
-        diskfree: '0',
-        features,
-      };
+    lines.forEach((line) => {
+      if (line.includes('State=')) {
+        state = line.match(/State=([^\s,]+)/)?.[1] || state;
+      }
+      if (line.includes('CPUTot=')) {
+        cpus = line.match(/CPUTot=(\d+)/)?.[1] || cpus;
+      }
+      if (line.includes('RealMemory=')) {
+        memory = line.match(/RealMemory=(\d+)/)?.[1] || memory;
+      }
+      if (line.includes('Features=')) {
+        features = line.match(/Features=([^\s]*)/)?.[1] || features;
+      }
     });
+
+    return {
+      nodename,
+      state,
+      cpus,
+      memory,
+      diskfree: '0',
+      features,
+    };
+  });
 
   if (detailed) {
     // Get aggregate summary using scontrol to verify total counts
