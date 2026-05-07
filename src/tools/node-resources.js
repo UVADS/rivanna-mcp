@@ -1,9 +1,10 @@
-import { parseSinfoOutput } from '../utils.js';
+import { parseSinfoOutput, expandNodeRanges } from '../utils.js';
 
 export async function getNodeResources(sshClient, options = {}) {
   const { partition, detailed = false } = options;
 
-  let command = 'sinfo --format="%20N %10t %6c %10m %d %50f" --noheader';
+  // Use -N flag to force one node per line and --all to get all nodes including hidden ones
+  let command = 'sinfo -N --all --format="%20N %10t %6c %10m %d %50f" --noheader';
 
   if (partition) {
     command += ` --partition=${partition}`;
@@ -24,27 +25,25 @@ export async function getNodeResources(sshClient, options = {}) {
         diskfree: parts[4],
         features: parts.slice(5).join(' '),
       };
-    });
+    })
+    .flat(); // Flatten in case expandNodeRanges is applied
 
   if (detailed) {
-    const clusterInfo = await sshClient.exec(
-      'sinfo --summarize --format="%20N %10t %6c %10m"'
-    );
-    const summary = clusterInfo
-      .trim()
-      .split('\n')
-      .reduce((acc, line) => {
-        if (line.includes('allocated')) acc.allocated = line;
-        if (line.includes('idle')) acc.idle = line;
-        if (line.includes('down')) acc.down = line;
-        return acc;
-      }, {});
+    // Get aggregate summary using scontrol to verify total counts
+    const scontrolSummary = await sshClient.exec('scontrol show config | grep NodeCount');
+
+    // Get state summary
+    const stateCmd = 'sinfo --all --summarize --format="%10t %10N"';
+    const stateSummary = await sshClient.exec(stateCmd);
 
     return {
       success: true,
       nodeCount: nodes.length,
       nodes,
-      summary,
+      summary: {
+        scontrolVerification: scontrolSummary.trim(),
+        stateSummary: stateSummary.trim(),
+      },
     };
   }
 

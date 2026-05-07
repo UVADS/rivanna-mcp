@@ -1,7 +1,7 @@
 export async function getClusterUsage24h(sshClient, options = {}) {
-  // Get current node info by partition with features
+  // Get current node info by partition with features - use -N --all to get all nodes
   const sinfoOutput = await sshClient.exec(
-    'sinfo --format="%20N %15P %6t %6c %10m %40f" --noheader'
+    'sinfo -N --all --format="%20N %15P %6t %6c %10m %40f" --noheader'
   );
 
   const nodesByPartition = {};
