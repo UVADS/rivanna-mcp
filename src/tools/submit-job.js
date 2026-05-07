@@ -1,4 +1,4 @@
-export async function submitJob(sshClient, options = {}) {
+export async function submitJob(sshClient, options = {}, config = {}) {
   const {
     jobName,
     allocation,
@@ -14,11 +14,14 @@ export async function submitJob(sshClient, options = {}) {
     submit = false,
   } = options;
 
+  // Use default allocation if not provided
+  const resolvedAllocation = allocation || config.defaultAllocation;
+
   // Validate required parameters
-  const required = { jobName, allocation, partition, cpus, memory, time };
+  const required = { jobName, resolvedAllocation, partition, cpus, memory, time };
   const missing = Object.entries(required)
     .filter(([_, v]) => !v)
-    .map(([k]) => k);
+    .map(([k]) => k === 'resolvedAllocation' ? 'allocation' : k);
 
   if (missing.length > 0) {
     throw new Error(
@@ -29,7 +32,7 @@ export async function submitJob(sshClient, options = {}) {
   // Build SLURM header
   let slurmScript = `#!/bin/bash
 #SBATCH --job-name=${jobName}
-#SBATCH --account=${allocation}
+#SBATCH --account=${resolvedAllocation}
 #SBATCH --partition=${partition}
 #SBATCH --nodes=${nodes}
 #SBATCH --cpus-per-task=${cpus}
@@ -105,7 +108,7 @@ export async function submitJob(sshClient, options = {}) {
 export const submitJobTool = {
   name: 'submit_job',
   description:
-    'Create and optionally submit a SLURM job file to Rivanna with configurable resources and parameters.',
+    'Create and optionally submit a SLURM job file to Rivanna with configurable resources and parameters. If no allocation is specified, uses the default allocation from setup.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -115,7 +118,8 @@ export const submitJobTool = {
       },
       allocation: {
         type: 'string',
-        description: 'Allocation/account to charge compute hours to',
+        description:
+          'Allocation/account to charge compute hours to (optional: uses default from setup if not specified)',
       },
       partition: {
         type: 'string',
@@ -170,7 +174,6 @@ export const submitJobTool = {
     },
     required: [
       'jobName',
-      'allocation',
       'partition',
       'cpus',
       'memory',

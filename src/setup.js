@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, writeFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { resolve } from 'path';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
 import SSHClient from './ssh-client.js';
+import { getAllocationInfo } from './tools/allocation-billing.js';
+
+const exec = promisify(execCallback);
 
 const CONFIG_DIR = join(homedir(), '.rivanna-mcp');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -44,6 +49,7 @@ async function testSSHConnection(hpcHost, computingId, sshKeyPath) {
     return {
       success: true,
       username: output.trim(),
+      sshClient,
     };
   } catch (error) {
     return {
@@ -51,6 +57,54 @@ async function testSSHConnection(hpcHost, computingId, sshKeyPath) {
       error: error.message,
     };
   }
+}
+
+async function queryAllocations(userIsRemote, sshClient, computingId) {
+  try {
+    console.log('\n⏳ Fetching your allocations...');
+    const allocInfo = await getAllocationInfo(sshClient, { user: computingId });
+
+    if (!allocInfo.success || !allocInfo.allocations || allocInfo.allocations.length === 0) {
+      return {
+        success: false,
+        error: 'No allocations found',
+      };
+    }
+
+    return {
+      success: true,
+      allocations: allocInfo.allocations,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+async function selectDefaultAllocation(allocations) {
+  const choices = allocations.map((alloc) => {
+    let label = `${alloc.account}`;
+    if (alloc.suAvailable) {
+      label += ` (${parseFloat(alloc.suAvailable).toFixed(0)} SU)`;
+    }
+    return {
+      name: label,
+      value: alloc.account,
+    };
+  });
+
+  const answer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'defaultAllocation',
+      message: 'Select your default allocation (used when creating jobs)',
+      choices,
+    },
+  ]);
+
+  return answer.defaultAllocation;
 }
 
 export async function runSetup() {
@@ -118,6 +172,7 @@ export async function runSetup() {
 
   // Test connection if remote
   let testResult = null;
+  let sshClient = null;
   if (userIsRemote) {
     const HPC_HOST = 'login.hpc.virginia.edu';
     testResult = await testSSHConnection(
@@ -148,6 +203,21 @@ export async function runSetup() {
       );
       process.exit(1);
     }
+    sshClient = testResult.sshClient;
+  }
+
+  // Query allocations
+  let allocResult = null;
+  let defaultAllocation = null;
+  if (sshClient || !userIsRemote) {
+    allocResult = await queryAllocations(userIsRemote, sshClient, answers.computingId);
+
+    if (allocResult.success && allocResult.allocations.length > 0) {
+      defaultAllocation = await selectDefaultAllocation(allocResult.allocations);
+    } else {
+      console.log('\n⚠️  Could not fetch allocations: ' + (allocResult.error || 'Unknown error'));
+      console.log('You can set a default allocation later by editing ~/.rivanna-mcp/config.json\n');
+    }
   }
 
   const HPC_HOST = 'login.hpc.virginia.edu';
@@ -162,6 +232,11 @@ export async function runSetup() {
   // Only include SSH key if remote
   if (userIsRemote) {
     config.sshKeyPath = expandPath(answers.sshKeyPath);
+  }
+
+  // Include default allocation if one was selected
+  if (defaultAllocation) {
+    config.defaultAllocation = defaultAllocation;
   }
 
   // Create config directory if it doesn't exist
@@ -181,6 +256,9 @@ export async function runSetup() {
   }
   console.log(`   HPC Host: ${config.hpcHost}`);
   console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
+  if (defaultAllocation) {
+    console.log(`   Default Allocation: ${defaultAllocation}`);
+  }
   if (testResult) {
     console.log(`\n🔐 SSH Connection: Connected as ${testResult.username}`);
   } else {
