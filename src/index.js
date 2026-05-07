@@ -6,8 +6,8 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import SSHClient from './ssh-client.js';
 import { loadConfig } from './config.js';
+import { createClient } from './client-factory.js';
 import { initializeLogger, logRequest, logError, logSuccess } from './logger.js';
 import { getJobStatus, jobStatusTool } from './tools/job-status.js';
 import {
@@ -34,12 +34,9 @@ import { submitJob, submitJobTool } from './tools/submit-job.js';
 
 const config = loadConfig();
 initializeLogger(config);
-const HPC_HOST = 'login.hpc.virginia.edu';
-const HPC_USER = config.computingId;
-const HPC_KEY = config.sshKeyPath;
 const loggingEnabled = config.logging !== false;
 
-const sshClient = new SSHClient(HPC_HOST, HPC_USER, HPC_KEY);
+const client = createClient(config);
 
 const server = new Server(
   {
@@ -77,35 +74,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let result;
     switch (name) {
       case 'get_job_status':
-        result = await getJobStatus(sshClient, args);
+        result = await getJobStatus(client, args);
         break;
 
       case 'get_node_resources':
-        result = await getNodeResources(sshClient, args);
+        result = await getNodeResources(client, args);
         break;
 
       case 'get_storage_quota':
-        result = await getStorageQuota(sshClient, args);
+        result = await getStorageQuota(client, args);
         break;
 
       case 'get_directory_usage':
-        result = await getDirectoryUsage(sshClient, args.path);
+        result = await getDirectoryUsage(client, args.path);
         break;
 
       case 'get_allocation_info':
-        result = await getAllocationInfo(sshClient, args);
+        result = await getAllocationInfo(client, args);
         break;
 
       case 'get_job_accounting':
-        result = await getJobAccounting(sshClient, args);
+        result = await getJobAccounting(client, args);
         break;
 
       case 'get_cluster_usage_24h':
-        result = await getClusterUsage24h(sshClient, args);
+        result = await getClusterUsage24h(client, args);
         break;
 
       case 'submit_job':
-        result = await submitJob(sshClient, args);
+        result = await submitJob(client, args);
         break;
 
       default:
@@ -152,8 +149,8 @@ main().catch((error) => {
 });
 
 process.on('SIGINT', () => {
-  if (sshClient) {
-    sshClient.close();
+  if (client) {
+    client.close();
   }
   process.exit(0);
 });

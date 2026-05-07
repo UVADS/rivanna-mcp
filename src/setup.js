@@ -59,7 +59,29 @@ export async function runSetup() {
     'This will configure your connection to the Rivanna HPC cluster.\n'
   );
 
-  const answers = await inquirer.prompt([
+  // First question: local or remote mode
+  const modeAnswers = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'userIsRemote',
+      message: 'How will you use this MCP?',
+      choices: [
+        {
+          name: 'Remote: Running Claude Code on my local workstation',
+          value: true,
+        },
+        {
+          name: 'Local: Already logged into a Rivanna compute node',
+          value: false,
+        },
+      ],
+    },
+  ]);
+
+  const userIsRemote = modeAnswers.userIsRemote;
+
+  // Build dynamic questions based on mode
+  const dynamicQuestions = [
     {
       type: 'input',
       name: 'computingId',
@@ -72,59 +94,75 @@ export async function runSetup() {
         return true;
       },
     },
-    {
+  ];
+
+  // Only ask for SSH key if remote
+  if (userIsRemote) {
+    dynamicQuestions.push({
       type: 'input',
       name: 'sshKeyPath',
       message: 'Path to SSH private key',
       default: join(homedir(), '.ssh/id_rsa'),
       validate: validateSSHKey,
-    },
-    {
-      type: 'confirm',
-      name: 'logging',
-      message: 'Enable logging of MCP interactions to ~/.rivanna-mcp/history.log?',
-      default: true,
-    },
-  ]);
-
-  // Test the SSH connection
-  const HPC_HOST = 'login.hpc.virginia.edu';
-  const testResult = await testSSHConnection(
-    HPC_HOST,
-    answers.computingId,
-    answers.sshKeyPath
-  );
-
-  if (!testResult.success) {
-    console.log(`\n❌ Connection failed: ${testResult.error}`);
-    console.log(
-      '\n📝 To use this MCP tool you must either be connected to the campus network or use a remote VPN.'
-    );
-    console.log(
-      '\n💡 Troubleshooting:'
-    );
-    console.log(
-      '   • Verify your Computing ID is correct'
-    );
-    console.log(
-      '   • Check that your SSH key exists and has proper permissions'
-    );
-    console.log(
-      '   • Ensure you are on the campus network or connected to VPN'
-    );
-    console.log(
-      '   • Try connecting manually: ssh -i ' + answers.sshKeyPath + ' ' + answers.computingId + '@' + HPC_HOST + '\n'
-    );
-    process.exit(1);
+    });
   }
 
+  dynamicQuestions.push({
+    type: 'confirm',
+    name: 'logging',
+    message: 'Enable logging of MCP interactions to ~/.rivanna-mcp/history.log?',
+    default: true,
+  });
+
+  const answers = await inquirer.prompt(dynamicQuestions);
+
+  // Test connection if remote
+  let testResult = null;
+  if (userIsRemote) {
+    const HPC_HOST = 'login.hpc.virginia.edu';
+    testResult = await testSSHConnection(
+      HPC_HOST,
+      answers.computingId,
+      answers.sshKeyPath
+    );
+
+    if (!testResult.success) {
+      console.log(`\n❌ Connection failed: ${testResult.error}`);
+      console.log(
+        '\n📝 To use this MCP tool you must either be connected to the campus network or use a remote VPN.'
+      );
+      console.log(
+        '\n💡 Troubleshooting:'
+      );
+      console.log(
+        '   • Verify your Computing ID is correct'
+      );
+      console.log(
+        '   • Check that your SSH key exists and has proper permissions'
+      );
+      console.log(
+        '   • Ensure you are on the campus network or connected to VPN'
+      );
+      console.log(
+        '   • Try connecting manually: ssh -i ' + answers.sshKeyPath + ' ' + answers.computingId + '@login.hpc.virginia.edu\n'
+      );
+      process.exit(1);
+    }
+  }
+
+  const HPC_HOST = 'login.hpc.virginia.edu';
   const config = {
     computingId: answers.computingId,
-    sshKeyPath: expandPath(answers.sshKeyPath),
+    userIsRemote,
     hpcHost: HPC_HOST,
     logging: answers.logging,
     createdAt: new Date().toISOString(),
   };
+
+  // Only include SSH key if remote
+  if (userIsRemote) {
+    config.sshKeyPath = expandPath(answers.sshKeyPath);
+  }
 
   // Create config directory if it doesn't exist
   if (!existsSync(CONFIG_DIR)) {
@@ -136,11 +174,18 @@ export async function runSetup() {
 
   console.log(`\n✅ Configuration saved to: ${CONFIG_FILE}`);
   console.log(`\n📋 Configuration:`);
+  console.log(`   Mode: ${userIsRemote ? 'Remote (via SSH)' : 'Local (direct execution)'}`);
   console.log(`   Computing ID: ${config.computingId}`);
-  console.log(`   SSH Key: ${config.sshKeyPath}`);
+  if (userIsRemote) {
+    console.log(`   SSH Key: ${config.sshKeyPath}`);
+  }
   console.log(`   HPC Host: ${config.hpcHost}`);
   console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
-  console.log(`\n🔐 SSH Connection: Connected as ${testResult.username}`);
+  if (testResult) {
+    console.log(`\n🔐 SSH Connection: Connected as ${testResult.username}`);
+  } else {
+    console.log(`\n✅ Local mode configured`);
+  }
   console.log(
     `\n🚀 You can now use the MCP server. It will be available for Claude Code integration.\n`
   );
