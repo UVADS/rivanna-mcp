@@ -2,7 +2,7 @@
 
 An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with Claude Code to give AI access to your cluster status, jobs, resources, and allocations.
 
-Some tools in this MCP:
+Some things you can do with this MCP:
 
 - What are my current jobs in Rivanna?
 - Stop my job ID 1234567890.
@@ -10,6 +10,7 @@ Some tools in this MCP:
 - How many GPUs are available in the cluster?
 - Tell me about my allocations.
 - Give me the job history for user `mst3k` over the past `N` days.
+- Help me submit a job to Rivanna with specific resources.
 
 ## Installation
 
@@ -120,7 +121,7 @@ With this configuration, Claude Code will automatically start the MCP server whe
 
 ### 3. Use in Claude Code
 
-Once configured (either running manually or via settings.json), you'll have access to 6 tools for monitoring your Rivanna cluster directly from Claude Code queries.
+Once configured (either running manually or via settings.json), you'll have access to 7 tools for monitoring and submitting jobs to your Rivanna cluster directly from Claude Code queries.
 
 ## Available Tools
 
@@ -194,6 +195,50 @@ Get job accounting and compute hour usage over a time period.
 get_job_accounting(user: "nem2p", days: 60)
 ```
 
+### `get_cluster_usage_24h`
+Get cluster CPU and memory usage trends for the last 24 hours with colored ASCII graphics.
+
+**Parameters:**
+None
+
+**Example:**
+```
+get_cluster_usage_24h()
+```
+
+### `submit_job`
+Create and optionally submit a SLURM job file to Rivanna with configurable resources.
+
+**Parameters:**
+- `jobName` (string, required): Name for the job (alphanumeric, underscores/hyphens OK)
+- `allocation` (string, required): Account/allocation to charge compute hours to
+- `partition` (string, required): Partition to submit to (`gpu`, `parallel`, `standard`, `largemem`)
+- `cpus` (integer, required): Number of CPU cores to request
+- `memory` (string, required): Memory to request (e.g., `"16GB"`, `"32GB"`, `"64GB"`)
+- `time` (string, required): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
+- `nodes` (integer, optional): Number of compute nodes (default: 1)
+- `gpus` (string, optional): Number of GPUs per node (only for gpu partition)
+- `outputPath` (string, optional): Path for stdout output file
+- `errorPath` (string, optional): Path for stderr output file
+- `scriptContent` (string, optional): Shell commands to execute in the job
+- `submit` (boolean, optional): Whether to submit immediately (default: false)
+
+**Usage in Claude Code:**
+
+Claude Code can guide you through job creation interactively. Just ask:
+
+```
+I want to submit a job to Rivanna that runs my Python script
+```
+
+Claude will interview you for the required parameters and can optionally submit the job.
+
+**Example workflow:**
+1. Claude asks about your allocation, partition, resource needs
+2. You provide answers
+3. Claude creates the SLURM script
+4. You can review it or let Claude submit it
+
 ## Configuration
 
 Configuration is automatically saved to `~/.rivanna-mcp/config.json`:
@@ -227,7 +272,7 @@ To automatically start rivanna-mcp when using Claude Code, add it to your projec
 Claude Code will now:
 - Automatically start the rivanna-mcp server when you begin a session
 - Manage the server lifecycle (no manual terminal needed)
-- Provide access to all 6 HPC tools in your prompts
+- Provide access to all 7 HPC tools in your prompts
 
 **Benefits:**
 - One less terminal to manage

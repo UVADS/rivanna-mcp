@@ -30,6 +30,7 @@ import {
   getClusterUsage24h,
   clusterUsage24hTool,
 } from './tools/usage-trends.js';
+import { submitJob, submitJobTool } from './tools/submit-job.js';
 
 const config = loadConfig();
 initializeLogger(config);
@@ -62,6 +63,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       allocationInfoTool,
       jobAccountingTool,
       clusterUsage24hTool,
+      submitJobTool,
     ],
   };
 });
@@ -100,6 +102,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_cluster_usage_24h':
         result = await getClusterUsage24h(sshClient, args);
+        break;
+
+      case 'submit_job':
+        result = await submitJob(sshClient, args);
         break;
 
       default:
