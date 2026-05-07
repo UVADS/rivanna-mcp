@@ -28,10 +28,75 @@ export async function getAllocationInfo(sshClient, options = {}) {
     };
   });
 
+  // Get SU balances from mam-balance
+  let suBalances = [];
+  try {
+    const mamBalanceOutput = await sshClient.exec('/opt/mam/9.1.2/bin/mam-balance');
+    suBalances = parseMamBalanceOutput(mamBalanceOutput);
+  } catch (error) {
+    // mam-balance may not be available, continue without SU info
+  }
+
+  // Merge SU information into allocations
+  const allocationsWithSU = allocations.map((alloc) => {
+    const suInfo = suBalances.find((su) => su.name === alloc.account);
+    const result = {
+      ...alloc,
+    };
+    if (suInfo) {
+      result.suBalance = suInfo.balance;
+      result.suAvailable = suInfo.available;
+      result.suReserved = suInfo.reserved;
+    }
+    return result;
+  });
+
   return {
     success: true,
-    allocations,
+    allocations: allocationsWithSU,
   };
+}
+
+function parseMamBalanceOutput(output) {
+  if (!output || output.trim().length === 0) return [];
+
+  const lines = output.trim().split('\n').filter((line) => line.trim());
+  if (lines.length < 2) return [];
+
+  // Parse header to identify column positions
+  const headerLine = lines[0];
+  const headers = headerLine.split(/\s+/).map((h) => h.toLowerCase());
+  const accounts = [];
+
+  // Parse data rows, skipping separator lines
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(/\s+/);
+
+    // Skip separator lines (e.g., "---- --------")
+    if (parts[0].startsWith('-') || !parts[1] || parts[1].startsWith('-')) {
+      continue;
+    }
+
+    const account = {};
+
+    headers.forEach((header, idx) => {
+      account[header] = parts[idx] || '';
+    });
+
+    if (account.name && !account.name.startsWith('-')) {
+      accounts.push({
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        reserved: account.reserved,
+        effective: account.effective,
+        creditlimit: account.creditlimit,
+        available: account.available,
+      });
+    }
+  }
+
+  return accounts;
 }
 
 export async function getJobAccounting(sshClient, options = {}) {
@@ -86,7 +151,7 @@ export async function getJobAccounting(sshClient, options = {}) {
 
 export const allocationInfoTool = {
   name: 'get_allocation_info',
-  description: 'Get resource allocation limits for users and accounts.',
+  description: 'Get resource allocation limits, SU balance, and account information for users.',
   inputSchema: {
     type: 'object',
     properties: {
