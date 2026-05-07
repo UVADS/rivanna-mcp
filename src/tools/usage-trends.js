@@ -121,6 +121,10 @@ export async function getClusterUsage24h(sshClient, options = {}) {
       capacityByPartition,
       jobs
     ),
+    capacityComparison: generateCapacityComparison(
+      nodesByPartition,
+      capacityByPartition
+    ),
   };
 
   // Calculate per-partition stats
@@ -258,6 +262,33 @@ function generatePartitionSummary(nodesByPartition, capacityByPartition, jobs) {
   summary += `└────────────────────────────────────────────────────────────────┘\n`;
 
   return summary;
+}
+
+function generateCapacityComparison(nodesByPartition, capacityByPartition) {
+  let chart = '\n┌─ Capacity vs Usage (Nodes)\n';
+  const barWidth = 40;
+
+  Object.keys(nodesByPartition)
+    .sort()
+    .forEach((partition) => {
+      const nodes = nodesByPartition[partition];
+      const totalNodes = nodes.idle + nodes.allocated + nodes.down + nodes.other;
+      const usedPercent = (nodes.allocated / totalNodes) * 100;
+      const filledLen = Math.round((usedPercent / 100) * barWidth);
+
+      const allocated = `\x1b[41m${'█'.repeat(filledLen)}\x1b[0m`;
+      const available = `\x1b[42m${'░'.repeat(Math.max(0, barWidth - filledLen - (nodes.down > 0 ? 2 : 0)))}\x1b[0m`;
+      const offline = nodes.down > 0 ? `\x1b[90m${'✕'.repeat(Math.min(2, nodes.down))}\x1b[0m` : '';
+
+      const bar = allocated + available + offline;
+      const percent = usedPercent.toFixed(0);
+
+      chart += `│ ${partition.padEnd(12)} ${bar.padEnd(barWidth + 15)} ${percent.padStart(3)}% (${nodes.allocated}/${totalNodes})\n`;
+    });
+
+  chart += `└─ Legend: \x1b[41m█\x1b[0m Allocated  \x1b[42m░\x1b[0m Idle  \x1b[90m✕\x1b[0m Offline\n`;
+
+  return chart;
 }
 
 export const clusterUsage24hTool = {
