@@ -1,83 +1,87 @@
 import { expandNodeRanges } from '../utils.js';
 
 export async function getClusterUsage24h(sshClient, options = {}) {
-  // Get current node info by partition with features - use -N --all to get all nodes
+  // Use sinfo for partition data (simpler than scontrol for this)
   const sinfoOutput = await sshClient.exec(
-    'sinfo -N --all --format="%20N %15P %6t %6c %10m %40f" --noheader'
+    'sinfo --all --format="%15P %10t %10N" --noheader | uniq'
   );
 
   const nodesByPartition = {};
   const capacityByPartition = {};
   const gpuNodesByType = {};
 
-  sinfoOutput
-    .trim()
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .forEach((line) => {
-      const parts = line.split(/\s+/);
-      const nodeSpec = parts[0];
-      // Expand SLURM node ranges (e.g., node[0-2] => node0, node1, node2)
-      const nodeNames = expandNodeRanges(nodeSpec);
-      const partition = parts[1];
-      const state = parts[2];
-      const cpus = parseInt(parts[3], 10);
-      const memory = parseInt(parts[4], 10);
-      const features = parts.slice(5).join(' ').toLowerCase();
+  // First get node details using scontrol to have accurate CPU/memory info
+  const scontrolOutput = await sshClient.exec('scontrol show nodes all');
+  const nodeData = {};
 
-      // Initialize partition if needed (only once per partition)
-      if (!nodesByPartition[partition]) {
-        nodesByPartition[partition] = {
-          idle: 0,
-          allocated: 0,
-          down: 0,
-          other: 0,
-        };
-        capacityByPartition[partition] = { totalCpus: 0, totalMemGb: 0 };
-      }
+  scontrolOutput.split('NodeName=').filter((b) => b.trim()).forEach((block) => {
+    const lines = block.split('\n');
+    const nodeName = lines[0].split(/\s+/)[0];
+    let cpus = 0,
+      memory = 0,
+      state = 'unknown',
+      partition = 'unknown',
+      features = '';
 
-      // Add capacity for each expanded node
-      nodeNames.forEach(() => {
-        capacityByPartition[partition].totalCpus += cpus;
-        capacityByPartition[partition].totalMemGb += memory;
-
-        if (state.includes('idle')) {
-          nodesByPartition[partition].idle++;
-        } else if (state.includes('alloc')) {
-          nodesByPartition[partition].allocated++;
-        } else if (state.includes('down')) {
-          nodesByPartition[partition].down++;
-        } else {
-          nodesByPartition[partition].other++;
-        }
-      });
-
-      // Track GPU nodes by type (once per range, not per node)
-      if (features.includes('v100')) {
-        trackGpuNode(gpuNodesByType, 'V100', state, nodeNames.length);
-      }
-      if (features.includes('a100_80gb')) {
-        trackGpuNode(gpuNodesByType, 'A100-80GB', state, nodeNames.length);
-      } else if (features.includes('a100_40gb')) {
-        trackGpuNode(gpuNodesByType, 'A100-40GB', state, nodeNames.length);
-      } else if (features.includes('a100')) {
-        trackGpuNode(gpuNodesByType, 'A100', state, nodeNames.length);
-      }
-      if (features.includes('a40')) {
-        trackGpuNode(gpuNodesByType, 'A40', state, nodeNames.length);
-      }
-      if (features.includes('a6000')) {
-        trackGpuNode(gpuNodesByType, 'A6000', state, nodeNames.length);
-      }
-      if (features.includes('h200')) {
-        trackGpuNode(gpuNodesByType, 'H200', state, nodeNames.length);
-      }
-      if (features.includes('rtx3090')) {
-        trackGpuNode(gpuNodesByType, 'RTX3090', state, nodeNames.length);
-      } else if (features.includes('rtx2080')) {
-        trackGpuNode(gpuNodesByType, 'RTX2080', state, nodeNames.length);
-      }
+    lines.forEach((line) => {
+      if (line.includes('CPUTot=')) cpus = parseInt(line.match(/CPUTot=(\d+)/)?.[1] || 0, 10);
+      if (line.includes('RealMemory=')) memory = parseInt(line.match(/RealMemory=(\d+)/)?.[1] || 0, 10);
+      if (line.includes('State=')) state = line.match(/State=([^\s,]+)/)?.[1] || state;
+      if (line.includes('Partitions=')) partition = line.match(/Partitions=([^\s]+)/)?.[1] || partition;
+      if (line.includes('Features=')) features = (line.match(/Features=([^\s]*)/)?.[1] || '').toLowerCase();
     });
+
+    nodeData[nodeName] = { cpus, memory, state, partition, features };
+  });
+
+  // Process partition and state information
+  Object.entries(nodeData).forEach(([nodeName, data]) => {
+    const { cpus, memory, state, partition, features } = data;
+
+    if (!nodesByPartition[partition]) {
+      nodesByPartition[partition] = { idle: 0, allocated: 0, down: 0, other: 0 };
+      capacityByPartition[partition] = { totalCpus: 0, totalMemGb: 0 };
+    }
+
+    capacityByPartition[partition].totalCpus += cpus;
+    capacityByPartition[partition].totalMemGb += memory;
+
+    if (state.includes('idle')) {
+      nodesByPartition[partition].idle++;
+    } else if (state.includes('alloc')) {
+      nodesByPartition[partition].allocated++;
+    } else if (state.includes('down')) {
+      nodesByPartition[partition].down++;
+    } else {
+      nodesByPartition[partition].other++;
+    }
+
+    // Track GPU nodes by type
+    if (features.includes('v100')) {
+      trackGpuNode(gpuNodesByType, 'V100', state, 1);
+    }
+    if (features.includes('a100_80gb')) {
+      trackGpuNode(gpuNodesByType, 'A100-80GB', state, 1);
+    } else if (features.includes('a100_40gb')) {
+      trackGpuNode(gpuNodesByType, 'A100-40GB', state, 1);
+    } else if (features.includes('a100')) {
+      trackGpuNode(gpuNodesByType, 'A100', state, 1);
+    }
+    if (features.includes('a40')) {
+      trackGpuNode(gpuNodesByType, 'A40', state, 1);
+    }
+    if (features.includes('a6000')) {
+      trackGpuNode(gpuNodesByType, 'A6000', state, 1);
+    }
+    if (features.includes('h200')) {
+      trackGpuNode(gpuNodesByType, 'H200', state, 1);
+    }
+    if (features.includes('rtx3090')) {
+      trackGpuNode(gpuNodesByType, 'RTX3090', state, 1);
+    } else if (features.includes('rtx2080')) {
+      trackGpuNode(gpuNodesByType, 'RTX2080', state, 1);
+    }
+  });
 
   // Get job accounting for last 24 hours with per-partition data
   const startDate = new Date();

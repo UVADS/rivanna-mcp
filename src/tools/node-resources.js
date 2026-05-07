@@ -3,32 +3,51 @@ import { parseSinfoOutput, expandNodeRanges } from '../utils.js';
 export async function getNodeResources(sshClient, options = {}) {
   const { partition, detailed = false } = options;
 
-  // Use -N flag to force one node per line and --all to get all nodes including hidden ones
-  let command = 'sinfo -N --all --format="%20N %10t %6c %10m %d %50f" --noheader';
+  // Use scontrol to get individual node info - more reliable than sinfo for large clusters
+  let command = 'scontrol show nodes all';
 
   if (partition) {
-    command += ` --partition=${partition}`;
+    command = `scontrol show nodes all | grep -A 20 "Partitions=${partition}"`;
   }
 
-  const output = await sshClient.exec(command);
-  const lines = output.trim().split('\n');
+  try {
+    const output = await sshClient.exec(command);
+    const nodeBlocks = output.split('NodeName=').filter((block) => block.trim().length > 0);
 
-  const nodes = lines
-    .filter((line) => line.trim().length > 0)
-    .flatMap((line) => {
-      const parts = line.split(/\s+/);
-      const nodeSpec = parts[0];
-      // Expand SLURM compressed node ranges (e.g., node[0-2] => node0, node1, node2)
-      const expandedNames = expandNodeRanges(nodeSpec);
+    const nodes = nodeBlocks.map((block) => {
+      const lines = block.split('\n');
+      const nodeLine = lines[0];
+      const nodename = nodeLine.split(/\s+/)[0];
 
-      return expandedNames.map((nodename) => ({
+      // Extract fields from the block
+      let state = 'unknown';
+      let cpus = '0';
+      let memory = '0';
+      let features = '';
+
+      lines.forEach((line) => {
+        if (line.includes('State=')) {
+          state = line.match(/State=([^\s,]+)/)?.[1] || state;
+        }
+        if (line.includes('CPUTot=')) {
+          cpus = line.match(/CPUTot=(\d+)/)?.[1] || cpus;
+        }
+        if (line.includes('RealMemory=')) {
+          memory = line.match(/RealMemory=(\d+)/)?.[1] || memory;
+        }
+        if (line.includes('Features=')) {
+          features = line.match(/Features=([^\s]*)/)?.[1] || features;
+        }
+      });
+
+      return {
         nodename,
-        state: parts[1],
-        cpus: parts[2],
-        memory: parts[3],
-        diskfree: parts[4],
-        features: parts.slice(5).join(' '),
-      }));
+        state,
+        cpus,
+        memory,
+        diskfree: '0',
+        features,
+      };
     });
 
   if (detailed) {
