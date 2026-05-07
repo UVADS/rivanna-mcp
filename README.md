@@ -14,6 +14,15 @@ Some things you can do with this MCP:
 
 ## Installation
 
+### Prerequisites
+
+- `node` and `npm` on your system. In Rivanna you can load this as a module.
+- An active Rivanna HPC account and allocation.
+- **SSH key pair** generated and authorized on Rivanna's login node
+- **Network access**: UVA network or VPN connection for remote access
+- `git` installed (for GitHub-based installation)
+- SSH access enabled if working remotely.
+
 ### Quick Install (with Claude Code Integration)
 
 One command to install globally AND hook into Claude Code:
@@ -422,24 +431,12 @@ https://github.com/uvads/rivanna-mcp/issues
 
 ## Uninstalling
 
- To completely uninstall rivanna-mcp and test a fresh install:                          
+To completely uninstall `rivanna-mcp`:
                                          
-  1. Uninstall the global npm package:                                                   
-  npm uninstall -g rivanna-mcp
+1. Uninstall the global npm package:                                                   
+
+    npm uninstall -g rivanna-mcp
                                                                                          
-  2. Remove the configuration directory:                    
-  rm -rf ~/.rivanna-mcp                                                                  
-                                                            
-  Then to test a fresh install:
+2. Remove the configuration directory:                    
 
-  # Install from GitHub
-  npm install -g github:uvads/rivanna-mcp                                                
-   
-  # Run setup wizard                                                                     
-  rivanna-mcp setup                                         
-
-  # Start the server
-  rivanna-mcp
-
-  This will give you a completely clean slate. The setup wizard will walk you through    
-  entering your credentials and testing the connection.
+    rm -rf ~/.rivanna-mcp                                                                  
