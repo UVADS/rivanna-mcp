@@ -1,3 +1,5 @@
+import { expandNodeRanges } from '../utils.js';
+
 export async function getClusterUsage24h(sshClient, options = {}) {
   // Get current node info by partition with features - use -N --all to get all nodes
   const sinfoOutput = await sshClient.exec(
@@ -14,13 +16,16 @@ export async function getClusterUsage24h(sshClient, options = {}) {
     .filter((line) => line.trim().length > 0)
     .forEach((line) => {
       const parts = line.split(/\s+/);
-      const nodeName = parts[0];
+      const nodeSpec = parts[0];
+      // Expand SLURM node ranges (e.g., node[0-2] => node0, node1, node2)
+      const nodeNames = expandNodeRanges(nodeSpec);
       const partition = parts[1];
       const state = parts[2];
       const cpus = parseInt(parts[3], 10);
       const memory = parseInt(parts[4], 10);
       const features = parts.slice(5).join(' ').toLowerCase();
 
+      // Initialize partition if needed (only once per partition)
       if (!nodesByPartition[partition]) {
         nodesByPartition[partition] = {
           idle: 0,
@@ -31,43 +36,46 @@ export async function getClusterUsage24h(sshClient, options = {}) {
         capacityByPartition[partition] = { totalCpus: 0, totalMemGb: 0 };
       }
 
-      capacityByPartition[partition].totalCpus += cpus;
-      capacityByPartition[partition].totalMemGb += memory;
+      // Add capacity for each expanded node
+      nodeNames.forEach(() => {
+        capacityByPartition[partition].totalCpus += cpus;
+        capacityByPartition[partition].totalMemGb += memory;
 
-      if (state.includes('idle')) {
-        nodesByPartition[partition].idle++;
-      } else if (state.includes('alloc')) {
-        nodesByPartition[partition].allocated++;
-      } else if (state.includes('down')) {
-        nodesByPartition[partition].down++;
-      } else {
-        nodesByPartition[partition].other++;
-      }
+        if (state.includes('idle')) {
+          nodesByPartition[partition].idle++;
+        } else if (state.includes('alloc')) {
+          nodesByPartition[partition].allocated++;
+        } else if (state.includes('down')) {
+          nodesByPartition[partition].down++;
+        } else {
+          nodesByPartition[partition].other++;
+        }
+      });
 
-      // Track GPU nodes by type
+      // Track GPU nodes by type (once per range, not per node)
       if (features.includes('v100')) {
-        trackGpuNode(gpuNodesByType, 'V100', state);
+        trackGpuNode(gpuNodesByType, 'V100', state, nodeNames.length);
       }
       if (features.includes('a100_80gb')) {
-        trackGpuNode(gpuNodesByType, 'A100-80GB', state);
+        trackGpuNode(gpuNodesByType, 'A100-80GB', state, nodeNames.length);
       } else if (features.includes('a100_40gb')) {
-        trackGpuNode(gpuNodesByType, 'A100-40GB', state);
+        trackGpuNode(gpuNodesByType, 'A100-40GB', state, nodeNames.length);
       } else if (features.includes('a100')) {
-        trackGpuNode(gpuNodesByType, 'A100', state);
+        trackGpuNode(gpuNodesByType, 'A100', state, nodeNames.length);
       }
       if (features.includes('a40')) {
-        trackGpuNode(gpuNodesByType, 'A40', state);
+        trackGpuNode(gpuNodesByType, 'A40', state, nodeNames.length);
       }
       if (features.includes('a6000')) {
-        trackGpuNode(gpuNodesByType, 'A6000', state);
+        trackGpuNode(gpuNodesByType, 'A6000', state, nodeNames.length);
       }
       if (features.includes('h200')) {
-        trackGpuNode(gpuNodesByType, 'H200', state);
+        trackGpuNode(gpuNodesByType, 'H200', state, nodeNames.length);
       }
       if (features.includes('rtx3090')) {
-        trackGpuNode(gpuNodesByType, 'RTX3090', state);
+        trackGpuNode(gpuNodesByType, 'RTX3090', state, nodeNames.length);
       } else if (features.includes('rtx2080')) {
-        trackGpuNode(gpuNodesByType, 'RTX2080', state);
+        trackGpuNode(gpuNodesByType, 'RTX2080', state, nodeNames.length);
       }
     });
 
@@ -321,19 +329,19 @@ function generateCapacityComparison(nodesByPartition, capacityByPartition) {
   return chart;
 }
 
-function trackGpuNode(gpuNodesByType, gpuType, state) {
+function trackGpuNode(gpuNodesByType, gpuType, state, count = 1) {
   if (!gpuNodesByType[gpuType]) {
     gpuNodesByType[gpuType] = { idle: 0, allocated: 0, down: 0, other: 0 };
   }
 
   if (state.includes('idle')) {
-    gpuNodesByType[gpuType].idle++;
+    gpuNodesByType[gpuType].idle += count;
   } else if (state.includes('alloc')) {
-    gpuNodesByType[gpuType].allocated++;
+    gpuNodesByType[gpuType].allocated += count;
   } else if (state.includes('down')) {
-    gpuNodesByType[gpuType].down++;
+    gpuNodesByType[gpuType].down += count;
   } else {
-    gpuNodesByType[gpuType].other++;
+    gpuNodesByType[gpuType].other += count;
   }
 }
 

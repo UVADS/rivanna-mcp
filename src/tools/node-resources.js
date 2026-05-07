@@ -15,18 +15,21 @@ export async function getNodeResources(sshClient, options = {}) {
 
   const nodes = lines
     .filter((line) => line.trim().length > 0)
-    .map((line) => {
+    .flatMap((line) => {
       const parts = line.split(/\s+/);
-      return {
-        nodename: parts[0],
+      const nodeSpec = parts[0];
+      // Expand SLURM compressed node ranges (e.g., node[0-2] => node0, node1, node2)
+      const expandedNames = expandNodeRanges(nodeSpec);
+
+      return expandedNames.map((nodename) => ({
+        nodename,
         state: parts[1],
         cpus: parts[2],
         memory: parts[3],
         diskfree: parts[4],
         features: parts.slice(5).join(' '),
-      };
-    })
-    .flat(); // Flatten in case expandNodeRanges is applied
+      }));
+    });
 
   if (detailed) {
     // Get aggregate summary using scontrol to verify total counts
