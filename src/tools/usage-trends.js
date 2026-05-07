@@ -1,11 +1,12 @@
 export async function getClusterUsage24h(sshClient, options = {}) {
-  // Get current node info by partition
+  // Get current node info by partition with features
   const sinfoOutput = await sshClient.exec(
-    'sinfo --format="%20N %15P %6t %6c %10m" --noheader'
+    'sinfo --format="%20N %15P %6t %6c %10m %40f" --noheader'
   );
 
   const nodesByPartition = {};
   const capacityByPartition = {};
+  const gpuNodesByType = {};
 
   sinfoOutput
     .trim()
@@ -13,10 +14,12 @@ export async function getClusterUsage24h(sshClient, options = {}) {
     .filter((line) => line.trim().length > 0)
     .forEach((line) => {
       const parts = line.split(/\s+/);
+      const nodeName = parts[0];
       const partition = parts[1];
       const state = parts[2];
       const cpus = parseInt(parts[3], 10);
       const memory = parseInt(parts[4], 10);
+      const features = parts.slice(5).join(' ').toLowerCase();
 
       if (!nodesByPartition[partition]) {
         nodesByPartition[partition] = {
@@ -39,6 +42,32 @@ export async function getClusterUsage24h(sshClient, options = {}) {
         nodesByPartition[partition].down++;
       } else {
         nodesByPartition[partition].other++;
+      }
+
+      // Track GPU nodes by type
+      if (features.includes('v100')) {
+        trackGpuNode(gpuNodesByType, 'V100', state);
+      }
+      if (features.includes('a100_80gb')) {
+        trackGpuNode(gpuNodesByType, 'A100-80GB', state);
+      } else if (features.includes('a100_40gb')) {
+        trackGpuNode(gpuNodesByType, 'A100-40GB', state);
+      } else if (features.includes('a100')) {
+        trackGpuNode(gpuNodesByType, 'A100', state);
+      }
+      if (features.includes('a40')) {
+        trackGpuNode(gpuNodesByType, 'A40', state);
+      }
+      if (features.includes('a6000')) {
+        trackGpuNode(gpuNodesByType, 'A6000', state);
+      }
+      if (features.includes('h200')) {
+        trackGpuNode(gpuNodesByType, 'H200', state);
+      }
+      if (features.includes('rtx3090')) {
+        trackGpuNode(gpuNodesByType, 'RTX3090', state);
+      } else if (features.includes('rtx2080')) {
+        trackGpuNode(gpuNodesByType, 'RTX2080', state);
       }
     });
 
@@ -125,6 +154,7 @@ export async function getClusterUsage24h(sshClient, options = {}) {
       nodesByPartition,
       capacityByPartition
     ),
+    gpuComparison: generateGpuComparison(gpuNodesByType),
   };
 
   // Calculate per-partition stats
@@ -285,6 +315,53 @@ function generateCapacityComparison(nodesByPartition, capacityByPartition) {
 
       chart += `│ ${partition.padEnd(12)} ${bar.padEnd(barWidth + 15)} ${percent.padStart(3)}% (${nodes.allocated}/${totalNodes})\n`;
     });
+
+  chart += `└─ Legend: \x1b[41m█\x1b[0m Allocated  \x1b[42m░\x1b[0m Idle  \x1b[90m✕\x1b[0m Offline\n`;
+
+  return chart;
+}
+
+function trackGpuNode(gpuNodesByType, gpuType, state) {
+  if (!gpuNodesByType[gpuType]) {
+    gpuNodesByType[gpuType] = { idle: 0, allocated: 0, down: 0, other: 0 };
+  }
+
+  if (state.includes('idle')) {
+    gpuNodesByType[gpuType].idle++;
+  } else if (state.includes('alloc')) {
+    gpuNodesByType[gpuType].allocated++;
+  } else if (state.includes('down')) {
+    gpuNodesByType[gpuType].down++;
+  } else {
+    gpuNodesByType[gpuType].other++;
+  }
+}
+
+function generateGpuComparison(gpuNodesByType) {
+  const gpuTypes = Object.keys(gpuNodesByType).sort();
+
+  if (gpuTypes.length === 0) {
+    return '\n┌─ GPU Nodes by Type\n│ No GPU nodes found\n└────────────────────────────────────────────────────────────────┘\n';
+  }
+
+  let chart = '\n┌─ GPU Nodes by Type\n';
+  const barWidth = 40;
+
+  gpuTypes.forEach((gpuType) => {
+    const nodes = gpuNodesByType[gpuType];
+    const totalNodes = nodes.idle + nodes.allocated + nodes.down + nodes.other;
+    const usedPercent = (nodes.allocated / totalNodes) * 100;
+    const filledLen = Math.round((usedPercent / 100) * barWidth);
+
+    const allocated = `\x1b[41m${'█'.repeat(filledLen)}\x1b[0m`;
+    const available = `\x1b[42m${'░'.repeat(Math.max(0, barWidth - filledLen - (nodes.down > 0 ? 2 : 0)))}\x1b[0m`;
+    const offline = nodes.down > 0 ? `\x1b[90m${'✕'.repeat(Math.min(2, nodes.down))}\x1b[0m` : '';
+
+    const bar = allocated + available + offline;
+    const percent = usedPercent.toFixed(0);
+
+    chart += `│ ${gpuType.padEnd(12)} ${bar.padEnd(barWidth + 15)} ${percent.padStart(3)}% (${nodes.allocated}/${totalNodes})\n`;
+  });
 
   chart += `└─ Legend: \x1b[41m█\x1b[0m Allocated  \x1b[42m░\x1b[0m Idle  \x1b[90m✕\x1b[0m Offline\n`;
 
