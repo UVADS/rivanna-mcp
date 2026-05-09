@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execCommand } from './command-runner.js';
 
 class SSHClient {
   constructor(host, username, privateKeyPath) {
@@ -18,41 +18,7 @@ class SSHClient {
       command,
     ];
 
-    return new Promise((resolve, reject) => {
-      const proc = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
-
-      const timeoutId = setTimeout(() => {
-        timedOut = true;
-        proc.kill();
-      }, timeout);
-
-      proc.stdout.on('data', (data) => {
-        stdout += data;
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data;
-      });
-
-      proc.on('close', (code) => {
-        clearTimeout(timeoutId);
-        if (timedOut) {
-          reject(new Error(`Command timed out after ${timeout}ms`));
-        } else if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`SSH command failed: ${stderr || `exit code ${code}`}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
-    });
+    return execCommand('ssh', args, { timeout, errorPrefix: 'SSH command failed' });
   }
 
   close() {

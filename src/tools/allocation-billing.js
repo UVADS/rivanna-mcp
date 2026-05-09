@@ -1,19 +1,16 @@
-import { parseSacctOutput } from '../utils.js';
+import { parseLineDelimited, shellQuote } from '../utils.js';
 
 export async function getAllocationInfo(sshClient, options = {}) {
-  const { user, days = 30 } = options;
+  const { user } = options;
 
   let command = `sacctmgr show assoc format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
 
   if (user) {
-    command = `sacctmgr show assoc user=${user} format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
+    command = `sacctmgr show assoc user=${shellQuote(user)} format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
   }
 
   const output = await sshClient.exec(command);
-  const lines = output
-    .trim()
-    .split('\n')
-    .filter((line) => line && !line.startsWith('Cluster'));
+  const lines = parseLineDelimited(output).filter((line) => !line.startsWith('Cluster'));
 
   const allocations = lines.map((line) => {
     const parts = line.split('|').filter((p) => p);
@@ -60,7 +57,7 @@ export async function getAllocationInfo(sshClient, options = {}) {
 function parseMamBalanceOutput(output) {
   if (!output || output.trim().length === 0) return [];
 
-  const lines = output.trim().split('\n').filter((line) => line.trim());
+  const lines = parseLineDelimited(output);
   if (lines.length < 2) return [];
 
   // Parse header to identify column positions
@@ -109,14 +106,11 @@ export async function getJobAccounting(sshClient, options = {}) {
   let command = `sacct --format=jobid,jobname,user,account,state,elapsed,cputimeraw,maxvmsize --noheader --start=${dateStr}`;
 
   if (user) {
-    command += ` --user=${user}`;
+    command += ` --user=${shellQuote(user)}`;
   }
 
   const output = await sshClient.exec(command);
-  const lines = output
-    .trim()
-    .split('\n')
-    .filter((line) => line.trim().length > 0);
+  const lines = parseLineDelimited(output);
 
   const jobs = lines.map((line) => {
     const parts = line.split(/\s+/);

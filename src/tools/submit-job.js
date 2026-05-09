@@ -1,3 +1,5 @@
+import { shellQuote } from '../utils.js';
+
 export async function submitJob(sshClient, options = {}, config = {}) {
   const {
     jobName,
@@ -68,13 +70,12 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const jobFilePath = `${homePath}/${jobFileName}`;
 
   // Write the job file
-  const escapedScript = slurmScript.replace(/'/g, "'\\''");
   await sshClient.exec(
-    `cat > '${jobFilePath}' << 'EOFSCRIPT'\n${slurmScript}\nEOFSCRIPT`
+    `cat > ${shellQuote(jobFilePath)} << 'EOFSCRIPT'\n${slurmScript}\nEOFSCRIPT`
   );
 
   // Make executable
-  await sshClient.exec(`chmod +x '${jobFilePath}'`);
+  await sshClient.exec(`chmod +x ${shellQuote(jobFilePath)}`);
 
   const result = {
     success: true,
@@ -86,7 +87,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 
   if (submit) {
     try {
-      const submitOutput = await sshClient.exec(`sbatch '${jobFilePath}'`);
+      const submitOutput = await sshClient.exec(`sbatch ${shellQuote(jobFilePath)}`);
       const jobIdMatch = submitOutput.match(/Submitted batch job (\d+)/);
       if (jobIdMatch) {
         result.jobId = jobIdMatch[1];

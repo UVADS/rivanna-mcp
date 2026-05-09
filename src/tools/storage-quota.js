@@ -1,4 +1,6 @@
-export async function getStorageQuota(sshClient, options = {}) {
+import { shellQuote } from '../utils.js';
+
+export async function getStorageQuota(sshClient) {
   // Get current username
   const usernameOutput = await sshClient.exec('whoami');
   const username = usernameOutput.trim();
@@ -14,7 +16,7 @@ export async function getStorageQuota(sshClient, options = {}) {
   for (const [type, config] of Object.entries(userQuotas)) {
     try {
       // Get disk usage in bytes
-      const duOutput = await sshClient.exec(`du -sb "${config.path}" 2>/dev/null | awk '{print $1}'`);
+      const duOutput = await sshClient.exec(`du -sb ${shellQuote(config.path)} 2>/dev/null | awk '{print $1}'`);
       const usageBytes = parseInt(duOutput.trim(), 10);
 
       if (isNaN(usageBytes)) {
@@ -77,7 +79,7 @@ function formatBytes(bytes) {
 }
 
 export async function getDirectoryUsage(sshClient, path = '.') {
-  const command = `du -sh "${path}"`;
+  const command = `du -sh ${shellQuote(path)}`;
   const output = await sshClient.exec(command);
   const [size] = output.trim().split('\t');
 

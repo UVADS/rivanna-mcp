@@ -1,3 +1,5 @@
+import { parseLineDelimited, shellQuote } from '../utils.js';
+
 export async function getJobStatus(sshClient, options = {}) {
   const { state = 'all', user, limit = 100 } = options;
 
@@ -5,15 +7,15 @@ export async function getJobStatus(sshClient, options = {}) {
   let command = `squeue --format='%i|%P|%j|%u|%T|%M|%l|%D|%R'`;
 
   if (state !== 'all') {
-    command += ` --states=${state}`;
+    command += ` --states=${shellQuote(state)}`;
   }
 
   if (user) {
-    command += ` --user=${user}`;
+    command += ` --user=${shellQuote(user)}`;
   }
 
   const output = await sshClient.exec(command);
-  const lines = output.trim().split('\n').filter(l => l.length > 0);
+  const lines = parseLineDelimited(output);
 
   let jobs = lines.slice(1).map(line => {
     const parts = line.split('|');

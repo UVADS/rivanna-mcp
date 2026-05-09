@@ -5,22 +5,20 @@ import { homedir } from 'os';
 const CONFIG_DIR = join(homedir(), '.rivanna-mcp');
 const LOG_FILE = join(CONFIG_DIR, 'history.log');
 
-export function initializeLogger(config) {
+export function initializeLogger() {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
 }
 
 function sanitizeArgs(args) {
-  const sanitized = { ...args };
+  const sanitized = { ...(args || {}) };
   const sensitiveKeys = ['password', 'token', 'secret', 'apiKey', 'key'];
 
-  sensitiveKeys.forEach(key => {
-    sensitiveKeys.forEach(sensitiveKey => {
-      if (sanitized[sensitiveKey]) {
-        sanitized[sensitiveKey] = '[REDACTED]';
-      }
-    });
+  sensitiveKeys.forEach((key) => {
+    if (sanitized[key]) {
+      sanitized[key] = '[REDACTED]';
+    }
   });
 
   return sanitized;

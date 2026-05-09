@@ -1,11 +1,6 @@
 import { expandNodeRanges } from '../utils.js';
 
 export async function getClusterUsage24h(sshClient, options = {}) {
-  // Use sinfo for partition data (simpler than scontrol for this)
-  const sinfoOutput = await sshClient.exec(
-    'sinfo --all --format="%15P %10t %10N" --noheader | uniq'
-  );
-
   const nodesByPartition = {};
   const capacityByPartition = {};
   const gpuNodesByType = {};
@@ -16,7 +11,18 @@ export async function getClusterUsage24h(sshClient, options = {}) {
 
   scontrolOutput.split('NodeName=').filter((b) => b.trim()).forEach((block) => {
     const lines = block.split('\n');
-    const nodeName = lines[0].split(/\s+/)[0];
+    let fullSpec = lines[0].split(/\s+/)[0];
+
+    // Extract clean node name - handle cases where scontrol output includes trailing text
+    let compressedName = fullSpec;
+    const bracketMatch = compressedName.match(/^([a-zA-Z0-9\-]+\[[^\]]*\])/);
+    if (bracketMatch) {
+      compressedName = bracketMatch[1];
+    } else {
+      compressedName = compressedName.split(',')[0];
+    }
+
+    // Extract common data from this block
     let cpus = 0,
       memory = 0,
       state = 'unknown',
@@ -31,7 +37,19 @@ export async function getClusterUsage24h(sshClient, options = {}) {
       if (line.includes('Features=')) features = (line.match(/Features=([^\s]*)/)?.[1] || '').toLowerCase();
     });
 
-    nodeData[nodeName] = { cpus, memory, state, partition, features };
+    // Expand comma-separated node specs
+    let expandedNames = [];
+    compressedName.split(',').forEach((spec) => {
+      spec = spec.trim();
+      if (spec.length > 0) {
+        expandedNames = expandedNames.concat(expandNodeRanges(spec));
+      }
+    });
+
+    // Store data for each expanded node name
+    expandedNames.forEach((nodeName) => {
+      nodeData[nodeName] = { cpus, memory, state, partition, features };
+    });
   });
 
   // Process partition and state information
