@@ -30,12 +30,13 @@ function generateDefaultJobName() {
   return `${dirName}-${randomChars}`;
 }
 
-async function findPythonFiles(cwd) {
+async function findCodeFiles(cwd, language) {
   const files = [];
+  const extensions = language === 'r' ? ['.R', '.r'] : ['.py'];
   try {
     const entries = await fs.readdir(cwd);
     for (const entry of entries) {
-      if (entry.endsWith('.py')) {
+      if (extensions.some(ext => entry.endsWith(ext))) {
         files.push(resolve(cwd, entry));
       }
     }
@@ -45,31 +46,56 @@ async function findPythonFiles(cwd) {
   return files;
 }
 
-async function handlePythonDependencies(cwd) {
+async function handleDependencies(cwd, language) {
   const depInfo = {
     hasRequirements: false,
     hasPipfile: false,
+    hasRenvLock: false,
+    hasDescription: false,
     requirementsPath: null,
     pipfilePath: null,
+    renvLockPath: null,
+    descriptionPath: null,
   };
 
-  const requirementsPath = resolve(cwd, 'requirements.txt');
-  const pipfilePath = resolve(cwd, 'Pipfile');
+  if (language === 'python') {
+    const requirementsPath = resolve(cwd, 'requirements.txt');
+    const pipfilePath = resolve(cwd, 'Pipfile');
 
-  try {
-    await fs.access(requirementsPath);
-    depInfo.hasRequirements = true;
-    depInfo.requirementsPath = requirementsPath;
-  } catch {
-    // requirements.txt doesn't exist
-  }
+    try {
+      await fs.access(requirementsPath);
+      depInfo.hasRequirements = true;
+      depInfo.requirementsPath = requirementsPath;
+    } catch {
+      // requirements.txt doesn't exist
+    }
 
-  try {
-    await fs.access(pipfilePath);
-    depInfo.hasPipfile = true;
-    depInfo.pipfilePath = pipfilePath;
-  } catch {
-    // Pipfile doesn't exist
+    try {
+      await fs.access(pipfilePath);
+      depInfo.hasPipfile = true;
+      depInfo.pipfilePath = pipfilePath;
+    } catch {
+      // Pipfile doesn't exist
+    }
+  } else if (language === 'r') {
+    const renvLockPath = resolve(cwd, 'renv.lock');
+    const descriptionPath = resolve(cwd, 'DESCRIPTION');
+
+    try {
+      await fs.access(renvLockPath);
+      depInfo.hasRenvLock = true;
+      depInfo.renvLockPath = renvLockPath;
+    } catch {
+      // renv.lock doesn't exist
+    }
+
+    try {
+      await fs.access(descriptionPath);
+      depInfo.hasDescription = true;
+      depInfo.descriptionPath = descriptionPath;
+    } catch {
+      // DESCRIPTION doesn't exist
+    }
   }
 
   return depInfo;
@@ -144,18 +170,27 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   // Create the job directory
   await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
 
-  // Auto-detect Python files and dependencies
+  // Auto-detect code files and dependencies based on language
   const cwd = process.cwd();
-  const pythonFiles = await findPythonFiles(cwd);
-  const depInfo = await handlePythonDependencies(cwd);
+  const codeFiles = await findCodeFiles(cwd, language);
+  const depInfo = await handleDependencies(cwd, language);
 
-  // Combine user-specified files with auto-detected Python files
-  const allFilesToTransfer = new Set([...filesToTransfer, ...pythonFiles]);
-  if (depInfo.hasRequirements) {
-    allFilesToTransfer.add(depInfo.requirementsPath);
-  }
-  if (depInfo.hasPipfile) {
-    allFilesToTransfer.add(depInfo.pipfilePath);
+  // Combine user-specified files with auto-detected code files
+  const allFilesToTransfer = new Set([...filesToTransfer, ...codeFiles]);
+  if (language === 'python') {
+    if (depInfo.hasRequirements) {
+      allFilesToTransfer.add(depInfo.requirementsPath);
+    }
+    if (depInfo.hasPipfile) {
+      allFilesToTransfer.add(depInfo.pipfilePath);
+    }
+  } else if (language === 'r') {
+    if (depInfo.hasRenvLock) {
+      allFilesToTransfer.add(depInfo.renvLockPath);
+    }
+    if (depInfo.hasDescription) {
+      allFilesToTransfer.add(depInfo.descriptionPath);
+    }
   }
 
   // Transfer files to job directory
@@ -203,7 +238,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   slurmScript += '\n\n# Load Rivanna modules\n';
   slurmScript += moduleCommands || '# No modules loaded\n';
 
-  // Handle Python dependencies
+  // Handle dependencies based on language
   if (language === 'python') {
     if (depInfo.hasPipfile) {
       slurmScript += '\n# Convert Pipfile to requirements.txt\n';
@@ -212,6 +247,15 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     if (depInfo.hasRequirements || depInfo.hasPipfile) {
       slurmScript += '\n# Install Python dependencies\n';
       slurmScript += 'pip install -r requirements.txt\n';
+    }
+  } else if (language === 'r') {
+    if (depInfo.hasRenvLock) {
+      slurmScript += '\n# Restore R environment from renv.lock\n';
+      slurmScript += 'Rscript -e "renv::restore()" 2>/dev/null || echo "Warning: renv restore failed, some packages may not be available"\n';
+    }
+    if (depInfo.hasDescription) {
+      slurmScript += '\n# Install R package dependencies from DESCRIPTION\n';
+      slurmScript += 'Rscript -e "if(!require(\'devtools\', quietly=TRUE)) install.packages(\'devtools\'); devtools::load_all(); devtools::install_deps()" 2>/dev/null || echo "Warning: package dependency installation failed"\n';
     }
   }
 
@@ -248,9 +292,15 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     errorFile: finalErrorPath,
     filesTransferred: transferredFiles,
     autoDetected: {
-      pythonFiles: pythonFiles.length,
-      hasPipfile: depInfo.hasPipfile,
-      hasRequirements: depInfo.hasRequirements,
+      codeFiles: codeFiles.length,
+      ...(language === 'python' && {
+        hasPipfile: depInfo.hasPipfile,
+        hasRequirements: depInfo.hasRequirements,
+      }),
+      ...(language === 'r' && {
+        hasRenvLock: depInfo.hasRenvLock,
+        hasDescription: depInfo.hasDescription,
+      }),
     },
     submitted: false,
     suggestedDefaults: {
