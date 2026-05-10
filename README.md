@@ -307,7 +307,7 @@ None
 - "Is the cluster busy right now?"
 
 ### `submit_job`
-Create and optionally submit a SLURM job file to Rivanna with configurable resources.
+Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
 
 **Parameters:**
 - `jobName` (string, required): Name for the job (alphanumeric, underscores/hyphens OK)
@@ -318,26 +318,43 @@ Create and optionally submit a SLURM job file to Rivanna with configurable resou
 - `time` (string, required): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
 - `nodes` (integer, optional): Number of compute nodes (default: 1)
 - `gpus` (string, optional): Number of GPUs per node (only for gpu partition)
-- `outputPath` (string, optional): Path for stdout output file
-- `errorPath` (string, optional): Path for stderr output file
+- `outputPath` (string, optional): Path for stdout output file (default: job directory)
+- `errorPath` (string, optional): Path for stderr output file (default: job directory)
 - `scriptContent` (string, optional): Shell commands to execute in the job
+- `language` (string, optional): Programming environment: `"python"` (miniforge), `"r"` (with goolf), or `"none"` (default: `"python"`)
+- `moduleVersion` (string, optional): Specific module version (e.g., `"py310"`, `"py311"` for Python)
 - `submit` (boolean, optional): Whether to submit immediately (default: false)
+
+**Job Organization:**
+
+Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp/`) containing:
+- The SLURM script
+- Job output and error logs (using SLURM's `%j` for the job ID)
+- Any supporting files (keeps `$HOME` clean)
+
+**Module System:**
+
+The tool automatically loads the appropriate Rivanna modules:
+- **Python** (default): Loads `module load miniforge` with Python 3.12 by default. Use `moduleVersion` for other versions (e.g., `"py310"`, `"py311"`)
+- **R**: Loads `module load goolf R` (goolf is required as a dependency). Use `module spider R` on Rivanna to discover available R versions
+- **None**: Skips module loading for custom environments
 
 **Usage in Claude Code:**
 
 Claude Code can guide you through job creation interactively. Just ask:
 
 ```
-I want to submit a job to Rivanna that runs my Python script
+I want to submit a Python job to Rivanna that processes data
 ```
 
-Claude will interview you for the required parameters and can optionally submit the job.
+Claude will interview you for the required parameters, recommend appropriate modules, and optionally submit the job.
 
 **Example workflow:**
-1. Claude asks about your allocation, partition, resource needs
+1. Claude asks about your allocation, partition, resource needs, and language preference
 2. You provide answers
-3. Claude creates the SLURM script
+3. Claude creates the SLURM script with appropriate module loading
 4. You can review it or let Claude submit it
+5. Your job files are organized in a dedicated directory
 
 ### `get_cluster_overview`
 Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
