@@ -43,9 +43,11 @@ class SSHClient {
     }
 
     // Use scp with SSH options for direct file transfer
+    // Suppress warnings by redirecting stderr to /dev/null
     const sshOptions = this.getSSHOptions();
-    const args = [...sshOptions, '-C', localPath, `${this.username}@${this.host}:${fullRemotePath}`];
-    await execCommand('scp', args, { timeout, errorPrefix: 'File transfer failed' });
+    const escapeForShell = (path) => `'${path.replace(/'/g, "'\\''")}'`;
+    const scpCmd = `scp ${sshOptions.join(' ')} -C ${escapeForShell(localPath)} ${escapeForShell(`${this.username}@${this.host}:${fullRemotePath}`)} 2>/dev/null`;
+    await execCommand('bash', ['-c', scpCmd], { timeout, errorPrefix: 'File transfer failed' });
 
     // Verify file transfer by comparing file sizes
     const remoteSize = await this.exec(`wc -c < '${fullRemotePath.replace(/'/g, "'\\''")}'`);
