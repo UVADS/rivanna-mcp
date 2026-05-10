@@ -317,35 +317,48 @@ Claude Code will now:
 
 ### System Architecture Diagram
 
-See `mcp-architecture.excalidraw` for a detailed visual diagram showing how the components interact:
-
-- **Left**: Your IDE clients (Claude Code, Cursor, Codex, Kiro)
-- **Center**: rivanna-mcp MCP server communicating via MCP Protocol
-- **Right**: Rivanna HPC cluster with SLURM commands (squeue, sinfo, sbatch, sacct)
-
-To view the diagram:
-1. Open [Excalidraw](https://excalidraw.com)
-2. Click "Open" and upload `mcp-architecture.excalidraw`
-
-Or export it to PNG/SVG using the Excalidraw CLI or desktop app.
-
-### How It Works
-
+```mermaid
+graph LR
+    Claude["Claude Code"] -->|MCP Protocol| MCP["rivanna-mcp<br/>MCP Server"]
+    Cursor["Cursor"] -->|MCP Protocol| MCP
+    Codex["Codex"] -->|MCP Protocol| MCP
+    Kiro["Kiro"] -->|MCP Protocol| MCP
+    
+    MCP -->|SSH| Rivanna["Rivanna<br/>Login Node"]
+    
+    Rivanna -->|squeue| SQueue["Job Status"]
+    Rivanna -->|sinfo| SInfo["Node Resources"]
+    Rivanna -->|sbatch| SBatch["Job Submission"]
+    Rivanna -->|sacct| SAckt["Job Accounting"]
+    
+    style Claude fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Cursor fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Codex fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Kiro fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style MCP fill:#3b82f6,stroke:#1e3a5f,color:#fff
+    style Rivanna fill:#3b82f6,stroke:#1e3a5f,color:#fff
+    style SQueue fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SInfo fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SBatch fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SAckt fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
 ```
-Claude Code / Cursor / Codex / Kiro
-    ↓ (MCP Protocol)
-rivanna-mcp (MCP server)
-    ↓ (SSH)
-Rivanna Login Node
-    ↓ (SLURM commands)
-SLURM (squeue, sinfo, sbatch, sacct, etc.)
-```
+
+**How It Works:**
+
+The MCP server acts as a bridge between your IDE and Rivanna:
+
+1. **IDE Clients** (left): Claude Code, Cursor, Codex, Kiro connect via MCP Protocol
+2. **MCP Server** (center): Receives queries and translates them to SLURM commands
+3. **SSH Connection**: Securely tunnels to Rivanna's login node
+4. **SLURM Commands**: Executes job queries and submissions on the cluster
 
 The MCP server:
-1. Spawns native SSH processes for each command execution
-2. Parses SLURM command output into structured data
-3. Returns results via the MCP protocol
-4. Supports post-quantum key exchange algorithms for enhanced security
+- Spawns native SSH processes for each command execution
+- Parses SLURM command output into structured data
+- Returns results via the MCP protocol
+- Supports post-quantum key exchange algorithms for enhanced security
+
+For a detailed visual diagram, see `mcp-architecture.excalidraw` (open in [Excalidraw.com](https://excalidraw.com))
 
 ## Development
 
