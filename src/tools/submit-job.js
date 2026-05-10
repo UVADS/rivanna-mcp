@@ -1,5 +1,25 @@
 import { shellQuote } from '../utils.js';
 
+// Module system configuration for Rivanna
+// Defines default module loading commands for common languages/environments
+const LANGUAGE_MODULES = {
+  python: {
+    description: 'Python with Miniforge (recommended for most Python jobs)',
+    moduleLoad: 'module load miniforge',
+    versions: ['py310', 'py311', 'py312'], // Common version suffixes for miniforge
+    defaultVersion: 'py312',
+  },
+  r: {
+    description: 'R with GNU compiler toolchain (goolf is required dependency)',
+    moduleLoad: 'module load goolf R',
+    notes: 'Run "module spider R" on Rivanna to see available R versions',
+  },
+  none: {
+    description: 'No module loading (use system defaults)',
+    moduleLoad: '',
+  },
+};
+
 export async function submitJob(sshClient, options = {}, config = {}) {
   const {
     jobName,
@@ -13,6 +33,8 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     outputPath,
     errorPath,
     scriptContent,
+    language = 'python', // Default to Python with miniforge
+    moduleVersion,
     submit = false,
   } = options;
 
@@ -31,7 +53,40 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     );
   }
 
+  // Validate language
+  if (!LANGUAGE_MODULES[language]) {
+    throw new Error(
+      `Unsupported language: ${language}. Supported: ${Object.keys(LANGUAGE_MODULES).join(', ')}`
+    );
+  }
+
+  // Get user's home directory
+  const homeDir = await sshClient.exec('echo $HOME');
+  const homePath = homeDir.trim();
+
+  // Create a per-job directory to keep $HOME clean
+  // Format: ~/rivanna-jobs/jobname_timestamp/
+  const timestamp = Date.now();
+  const jobDirName = `${jobName}_${timestamp}`;
+  const jobDir = `${homePath}/rivanna-jobs/${jobDirName}`;
+
+  // Create the job directory
+  await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
+
+  // Build module loading commands
+  let moduleCommands = '';
+  const langConfig = LANGUAGE_MODULES[language];
+  if (langConfig.moduleLoad) {
+    const finalModule = moduleVersion
+      ? `${langConfig.moduleLoad}/${moduleVersion}`
+      : langConfig.moduleLoad;
+    moduleCommands = `${finalModule}\n`;
+  }
+
   // Build SLURM header
+  const finalOutputPath = outputPath || `${jobDir}/%j.out`; // Use %j for job ID
+  const finalErrorPath = errorPath || `${jobDir}/%j.err`;
+
   let slurmScript = `#!/bin/bash
 #SBATCH --job-name=${jobName}
 #SBATCH --account=${resolvedAllocation}
@@ -39,35 +94,27 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 #SBATCH --nodes=${nodes}
 #SBATCH --cpus-per-task=${cpus}
 #SBATCH --mem=${memory}
-#SBATCH --time=${time}`;
+#SBATCH --time=${time}
+#SBATCH --output=${finalOutputPath}
+#SBATCH --error=${finalErrorPath}`;
 
   if (gpus) {
     slurmScript += `\n#SBATCH --gpus-per-node=${gpus}`;
   }
 
-  if (outputPath) {
-    slurmScript += `\n#SBATCH --output=${outputPath}`;
-  }
+  slurmScript += '\n\n# Load Rivanna modules\n';
+  slurmScript += moduleCommands || '# No modules loaded\n';
 
-  if (errorPath) {
-    slurmScript += `\n#SBATCH --error=${errorPath}`;
-  }
-
-  slurmScript += '\n\n# Job commands below:\n';
+  slurmScript += '\n# Job commands below:\n';
   if (scriptContent) {
     slurmScript += scriptContent;
   } else {
     slurmScript += 'echo "Job started on $(hostname)"\n';
   }
 
-  // Create job file path - use user's home directory
-  const timestamp = Date.now();
-  const jobFileName = `${jobName}_${timestamp}.slurm`;
-
-  // Write to home directory by default, or use provided path
-  const homeDir = await sshClient.exec('echo $HOME');
-  const homePath = homeDir.trim();
-  const jobFilePath = `${homePath}/${jobFileName}`;
+  // Create job file in the job-specific directory
+  const jobFileName = `${jobName}.slurm`;
+  const jobFilePath = `${jobDir}/${jobFileName}`;
 
   // Write the job file
   await sshClient.exec(
@@ -79,9 +126,16 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 
   const result = {
     success: true,
+    jobDir,
+    jobDirName,
     jobFilePath,
     jobFileName,
     jobScript: slurmScript,
+    language,
+    moduleVersion: moduleVersion || langConfig.defaultVersion || 'default',
+    modulesLoaded: langConfig.moduleLoad ? true : false,
+    outputFile: finalOutputPath,
+    errorFile: finalErrorPath,
     submitted: false,
   };
 
@@ -172,6 +226,18 @@ export const submitJobTool = {
         description: 'Whether to submit the job immediately to SLURM (default: false)',
         default: false,
       },
+      language: {
+        type: 'string',
+        description:
+          'Programming language/environment: "python" (with miniforge), "r" (with goolf), or "none" (default: python)',
+        enum: ['python', 'r', 'none'],
+        default: 'python',
+      },
+      moduleVersion: {
+        type: 'string',
+        description:
+          'Optional specific module version (e.g., "py310", "py311" for Python, or an R version). If omitted, uses default.',
+      },
     },
     required: [
       'jobName',
@@ -182,3 +248,6 @@ export const submitJobTool = {
     ],
   },
 };
+
+// Export module configuration for reference/testing
+export { LANGUAGE_MODULES };
