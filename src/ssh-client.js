@@ -23,9 +23,8 @@ class SSHClient {
   }
 
   async transferFile(localPath, remotePath, timeout = 60000) {
-    // Use SSH piping with cat for reliable file transfer
-    // Avoids rsync spawn issues and Rivanna's SCP hang problem
-    // Properly escapes single quotes in paths
+    // Use base64 encoding with SSH piping for reliable binary-safe transfer
+    // Avoids truncation issues with direct piping and handles all file types
     // Verifies transfer by comparing local and remote file sizes
 
     // Get local file size for verification
@@ -48,8 +47,10 @@ class SSHClient {
     const escapedRemote = escapeQuote(fullRemotePath);
 
     const sshOptions = this.getSSHOptions().join(' ');
-    const remoteCmd = `cat > '${escapedRemote}'`;
-    const shellCmd = `cat '${escapedLocal}' | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
+    // Use base64 encoding to safely pipe binary data through SSH
+    // Decode on remote end and write to file
+    const remoteCmd = `base64 -d > '${escapedRemote}'`;
+    const shellCmd = `cat '${escapedLocal}' | base64 | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
 
     const args = ['-c', shellCmd];
     await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
