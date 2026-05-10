@@ -220,16 +220,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const finalOutputPath = outputPath || `${jobDir}/%j.out`; // Use %j for job ID
   const finalErrorPath = errorPath || `${jobDir}/%j.err`;
 
-  let slurmScript = `#!/bin/bash
-#SBATCH --job-name=${finalJobName}
-#SBATCH --account=${resolvedAllocation}
-#SBATCH --partition=${finalPartition}
-#SBATCH --nodes=${nodes}
-#SBATCH --cpus-per-task=${finalCpus}
-#SBATCH --mem=${finalMemory}
-#SBATCH --time=${finalTime}
-#SBATCH --output=${finalOutputPath}
-#SBATCH --error=${finalErrorPath}`;
+  let slurmScript = `#!/bin/bash\n#SBATCH --job-name=${finalJobName}\n#SBATCH --account=${resolvedAllocation}\n#SBATCH --partition=${finalPartition}\n#SBATCH --nodes=${nodes}\n#SBATCH --cpus-per-task=${finalCpus}\n#SBATCH --mem=${finalMemory}\n#SBATCH --time=${finalTime}\n#SBATCH --output=${finalOutputPath}\n#SBATCH --error=${finalErrorPath}`;
 
   if (gpus) {
     slurmScript += `\n#SBATCH --gpus-per-node=${gpus}`;
@@ -337,84 +328,93 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 export const submitJobTool = {
   name: 'submit_job',
   description:
-    'Create and optionally submit a SLURM job file to Rivanna with configurable resources and parameters. Default values: job name uses project folder name + 6 random chars, walltime limit 1 hour, submit immediately set to YES. These are suggested but can be overridden during the interview.',
+    'Create and optionally submit a SLURM job script to Rivanna HPC cluster with smart resource configuration and automatic project setup. Handles the complete workflow: generates SLURM job script with specified resources, auto-detects language (Python/R) and dependencies (requirements.txt/Pipfile/renv.lock), transfers local code and data files to cluster, loads appropriate environment modules, installs dependencies, and optionally submits the job to the scheduler. Creates isolated job directory (~/rivanna-jobs/jobname_timestamp/) to keep your home directory organized. Returns job script content, job ID, submission status, and which files were transferred. Use this as the primary tool for launching computations on Rivanna. Combine with get_job_status to monitor job progress and cancel_job to stop jobs if needed. Supports sensible defaults for all resource parameters, so minimum call is just: {scriptContent: "your bash commands"}. Language auto-detection and dependency resolution make it ideal for Python and R projects.',
   inputSchema: {
     type: 'object',
     properties: {
       jobName: {
         type: 'string',
-        description: 'Name for the SLURM job (optional: defaults to project-folder-XXXXXX with 6 random alphanumeric chars)',
+        description: 'Name for the SLURM job displayed in queue and output files (optional: defaults to "projectname-XXXXXX" using your current directory name plus random suffix). Good for identifying jobs in queues.',
       },
       allocation: {
         type: 'string',
         description:
-          'Allocation/account to charge compute hours to (optional: uses default from setup if not specified)',
+          'Rivanna allocation/account name to charge compute hours against (e.g., "your-pi-account", "class-allocation"). REQUIRED - query your allocation with get_allocation_info if you don\'t know it. Determines which SU budget the job costs come from.',
       },
       partition: {
         type: 'string',
         description:
-          'Partition to submit to (e.g., "gpu", "parallel", "standard", "largemem") (optional: defaults to "standard")',
+          'SLURM partition/queue to submit to (default: "standard" for CPU work): "standard" (CPU-only general purpose), "parallel" (multi-node CPU jobs), "gpu" (GPU-accelerated, pair with gpus parameter), "largemem" (high-memory nodes), or others. Choose based on your workload: GPU jobs go to gpu partition, massively parallel to parallel, everything else to standard.',
+        default: 'standard',
       },
       cpus: {
         type: 'integer',
-        description: 'Number of CPU cores to request (optional: defaults to 4)',
+        description:
+          'Number of CPU cores per task to request (default: 4). Match your application: single-threaded = 1, Python scripts = 4-8, threaded workloads = match thread count, MPI jobs = use parallel partition instead. More CPUs = longer queue waits; use get_node_resources to see what\'s available.',
+        default: 4,
         minimum: 1,
       },
       memory: {
         type: 'string',
         description:
-          'Memory to request in format like "16GB", "32GB", or "64GB" (optional: defaults to "16GB")',
+          'RAM memory to allocate per job in format "16GB", "32GB", "64GB", etc (default: "16GB"). Check get_node_resources for per-node memory limits. Common: 16GB for small jobs, 32GB+ for data processing, 128GB+ for ML training. Job fails if it exceeds this.',
+        default: '16GB',
       },
       time: {
         type: 'string',
-        description: 'Walltime limit in HH:MM:SS format (optional: defaults to "01:00:00" / 1 hour)',
+        description:
+          'Maximum wall-clock runtime in HH:MM:SS format (default: "01:00:00" = 1 hour). Job gets killed when time expires. Plan conservatively: quick test = 10 minutes, typical work = 1-4 hours, long training = 8-24+ hours. Longer times = longer queues. Check job output with get_directory_usage.',
+        default: '01:00:00',
       },
       nodes: {
         type: 'integer',
-        description: 'Number of compute nodes (default: 1)',
+        description:
+          'Number of compute nodes to allocate (default: 1 node). Use >1 only for multi-node MPI/distributed jobs; single-node jobs don\'t benefit from more nodes. Requires parallel partition. One node usually has 32-40 cores.',
         default: 1,
         minimum: 1,
       },
       gpus: {
         type: 'string',
         description:
-          'Number of GPUs to request per node (e.g., "1", "2", "4") - only valid for gpu partition',
+          'Number of GPUs per node to request (e.g., "1", "2", "4"). ONLY valid with partition="gpu". Check get_cluster_usage_24h for GPU availability (V100, A100, A40, etc). Most jobs use 1-2 GPUs; NVIDIA often ships example code for multi-GPU.',
       },
       outputPath: {
         type: 'string',
         description:
-          'Path for stdout output file (default: slurm-JOBID.out in job directory)',
+          'Path for job stdout (normal output) file (default: job directory with auto-generated name). Use "%j" for job ID substitution (e.g., "/path/%j.out"). Stdout contains your print/echo statements and log messages.',
       },
       errorPath: {
         type: 'string',
         description:
-          'Path for stderr output file (default: same as output file)',
+          'Path for job stderr (error output) file (default: same directory as stdout). Captured errors, warnings, and diagnostics go here. Check this file if jobs fail.',
       },
       scriptContent: {
         type: 'string',
         description:
-          'Shell commands/script content to execute in the job (bash commands)',
+          'Bash shell commands to execute in your job (e.g., "python train.py" or "R CMD BATCH myscript.R"). Can be multiline. Runs in the job directory with your transferred code files available. Omitting this uses a simple echo statement.',
       },
       submit: {
         type: 'boolean',
-        description: 'Whether to submit the job immediately to SLURM (default: true)',
+        description:
+          'Whether to immediately submit the job to the scheduler (default: true). Set to false to create the job script without submitting, review it, then submit manually with exec_command "sbatch path/to/script.slurm".',
+        default: true,
       },
       language: {
         type: 'string',
         description:
-          'Programming language/environment: "python" (with miniforge), "r" (with goolf), or "none" (default: python)',
+          'Programming language for auto-detection and module loading: "python" (default, loads miniforge with py312), "r" (loads goolf + R), or "none" (no modules, use system defaults). Auto-detects code files: finds *.py (Python) or *.R/*.r (R) in current directory and transfers them.',
         enum: ['python', 'r', 'none'],
         default: 'python',
       },
       moduleVersion: {
         type: 'string',
         description:
-          'Optional specific module version (e.g., "py310", "py311" for Python, or an R version). If omitted, uses default.',
+          'Specific module version to load (optional). For Python: "py310", "py311", "py312" (default). For R: exact R version string. Only needed if you need non-default version. Query available with exec_command "module avail python" or "module spider R".',
       },
       filesToTransfer: {
         type: 'array',
         description:
-          'Optional array of local file paths to copy to the job directory. Files are transferred via rsync to login.hpc.virginia.edu',
+          'List of local file paths to upload to job directory before running (optional, e.g., ["/path/to/data.csv", "./config.json"]). Absolute or relative paths. Auto-detects code files + requirements.txt/Pipfile (Python) or renv.lock/DESCRIPTION (R), so usually unnecessary. Pair with scriptContent that references these files by name.',
         items: {
           type: 'string',
         },

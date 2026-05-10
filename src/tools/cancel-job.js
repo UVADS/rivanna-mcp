@@ -41,18 +41,18 @@ export async function cancelJob(sshClient, options = {}) {
 export const cancelJobTool = {
   name: 'cancel_job',
   description:
-    'Cancel a running or pending SLURM job by job ID. Sends SIGTERM by default (graceful shutdown).',
+    'Terminate a running or pending SLURM job by job ID with configurable signal handling. Use this tool to stop jobs that are consuming resources, have stalled, or are no longer needed. Sends SIGTERM (graceful shutdown) by default which allows the job process to clean up; use SIGKILL as a stronger signal if the job doesn\'t respond to SIGTERM. Essential for managing job lifecycle: check job status with get_job_status to get the job_id, then use this tool to cancel it. Returns success confirmation with the signal used and any process output. Handles the common case where a job has already completed or been cancelled (returns informative error rather than failing).',
   inputSchema: {
     type: 'object',
     properties: {
       jobId: {
         type: 'string',
-        description: 'The SLURM job ID to cancel (required). Get from get_job_status tool.',
+        description: 'The SLURM job ID to cancel (required). Obtain this from get_job_status tool which lists all jobs with their IDs.',
       },
       signal: {
         type: 'string',
         description:
-          'Signal to send: SIGTERM (graceful, default), SIGKILL (force), or other UNIX signal',
+          'UNIX signal to send for termination: "SIGTERM" (default, graceful) allows job to clean up before exiting, "SIGKILL" (force) immediately terminates without cleanup, or other standard UNIX signals like SIGINT, SIGHUP. SIGTERM is preferred as it gives jobs time to save state.',
         default: 'SIGTERM',
       },
     },

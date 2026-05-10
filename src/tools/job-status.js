@@ -47,23 +47,23 @@ export async function getJobStatus(sshClient, options = {}) {
 export const jobStatusTool = {
   name: 'get_job_status',
   description:
-    'Get job status from SLURM queue. Returns running, queued, and completed jobs.',
+    'Query the SLURM job queue to monitor and track all jobs on Rivanna HPC cluster. Returns detailed information for each job: job_id (SLURM identifier), partition (which queue it\'s in: standard/parallel/gpu/largemem), job name, user/owner, current status, time elapsed, time remaining until limit, node count allocated, and specific node list. Use this tool to: (1) monitor long-running computations and check progress, (2) verify jobs submitted via submit_job actually started, (3) check queue backlog and estimate when your pending job will run, (4) identify stuck or failed jobs that need investigation with get_allocation_info, (5) understand cluster utilization patterns, (6) find job_id values needed to cancel jobs with cancel_job. Supports efficient filtering by job state, user, and result limits for large clusters.',
   inputSchema: {
     type: 'object',
     properties: {
       state: {
         type: 'string',
         description:
-          'Job state filter: all, RUNNING, PENDING, COMPLETED, FAILED, CANCELLED',
+          'Filter jobs by execution state. "all" (default) returns all jobs; "RUNNING" shows actively executing jobs; "PENDING" shows queued jobs waiting for resources; "COMPLETED" shows finished jobs; "FAILED" shows jobs that exited with error status; "CANCELLED" shows manually terminated jobs. Filtering by state is significantly faster on loaded clusters.',
         default: 'all',
       },
       user: {
         type: 'string',
-        description: 'Filter by username (optional)',
+        description: 'Filter to show only jobs belonging to a specific username (e.g., "nmagee" or "nem2p"). Useful for monitoring your own jobs or troubleshooting a specific user\'s activity. Omit to see all jobs across the entire cluster.',
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of jobs to return',
+        description: 'Limit the number of job records returned (default 100). Increase when managing many simultaneous jobs, decrease for faster queries when only monitoring a few jobs.',
         default: 100,
       },
     },

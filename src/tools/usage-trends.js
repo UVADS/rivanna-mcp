@@ -401,7 +401,7 @@ function generateGpuComparison(gpuNodesByType) {
 export const clusterUsage24hTool = {
   name: 'get_cluster_usage_24h',
   description:
-    'Get cluster CPU and memory usage trends for the last 24 hours with detailed partition breakdown and utilization percentages.',
+    'Get detailed 24-hour cluster utilization trends with per-hour CPU and memory usage breakdown by partition and GPU type. Returns: hourly CPU/memory utilization percentages with visual trend graphs, peak and average utilization metrics, partition-wise resource allocation and job counts, GPU node availability by type (V100/A100/A40/etc), and node state summaries (idle/allocated/down). Color-coded graphs show utilization patterns: green (light), cyan (light-moderate), blue (moderate), yellow (high), red (critical). Use this to: (1) identify peak usage times and plan job submission windows, (2) understand if cluster is over/under-subscribed, (3) find which partitions have queued jobs vs available resources, (4) check GPU availability before submitting GPU jobs, (5) estimate when to retry queued jobs, (6) debug why your job isn\'t starting despite available resources (may be stuck behind higher-priority work). Provides per-partition breakdown showing which partition has most congestion.',
   inputSchema: {
     type: 'object',
     properties: {},

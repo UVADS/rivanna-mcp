@@ -118,13 +118,14 @@ export async function getDirectoryUsage(sshClient, path = '.') {
 
 export const storageQuotaTool = {
   name: 'get_storage_quota',
-  description: 'Get storage quota information for all mounted filesystems.',
+  description:
+    'Check storage quota and usage limits for all your accessible filesystems on Rivanna. Returns quota information per filesystem: total quota limit, current usage, remaining space, and percent utilized. Rivanna provides multiple storage tiers: home (GPFS - persistent, backed up, good for permanent data), and scratch (Weka - high-performance temporary storage, not backed up, best for job I/O). Use this tool to: (1) check before submitting data-intensive jobs, (2) identify if you\'ve hit quota limits preventing new files, (3) plan data lifecycle (archive old results from home, clean up scratch after jobs complete), (4) estimate needed resources with get_allocation_info. Returns per-filesystem breakdown showing quota, usage, available space, and utilization percentage.',
   inputSchema: {
     type: 'object',
     properties: {
       filesystem: {
         type: 'string',
-        description: 'Filter by filesystem path (optional)',
+        description: 'Optional filter to show quota for a specific filesystem (e.g., "home", "scratch"). Omit to see all accessible storage.',
       },
     },
   },
@@ -132,13 +133,14 @@ export const storageQuotaTool = {
 
 export const directoryUsageTool = {
   name: 'get_directory_usage',
-  description: 'Get disk usage for a specific directory.',
+  description:
+    'Get the total disk usage of a specific directory or file tree on Rivanna. Returns human-readable size (e.g., "42.3GB"). Use this to: (1) find which directories are consuming space in home or scratch, (2) identify large files/datasets before archiving, (3) decide what to delete to free up quota, (4) verify how much space a job output consumed. Useful for disk cleanup workflows: run this on a directory to see size, then decide if it should be moved to permanent storage or deleted. Works recursively through subdirectories.',
   inputSchema: {
     type: 'object',
     properties: {
       path: {
         type: 'string',
-        description: 'Directory path to check (default: current directory)',
+        description: 'Path to directory or file to measure. Can be absolute (e.g., "/home/nmagee/data") or relative (e.g., "./results"). Defaults to current directory "."',
         default: '.',
       },
     },

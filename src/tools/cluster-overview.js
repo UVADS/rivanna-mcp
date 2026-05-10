@@ -96,7 +96,7 @@ function buildSummary(nodeData, usageData) {
 export const clusterOverviewTool = {
   name: 'get_cluster_overview',
   description:
-    'Get comprehensive cluster overview including capacity usage, GPU types, node status, and 24-hour trends with visualizations.',
+    'Get a comprehensive high-level summary of Rivanna cluster status, capacity, and recent activity in the last 24 hours. Combines node inventory, resource utilization trends, and partition health into a single view. Returns: total cluster capacity (CPUs, memory, nodes), current node states (idle/allocated/down), per-partition utilization percentages, GPU node availability, peak and average CPU/memory usage over 24 hours, most/least congested partitions, and visual graphs. Includes color-coded utilization charts for quick assessment of cluster health. Use this for: (1) executive summary of cluster status before starting work, (2) quick check if cluster is overloaded (high utilization may mean long queues), (3) identify underutilized partitions that might run jobs faster, (4) see GPU availability at a glance, (5) understand overall activity and decide job submission strategy. This is the "big picture" tool; drill down with get_cluster_usage_24h for hourly trends, get_node_resources for per-node details, and get_job_status for specific job tracking.',
   inputSchema: {
     type: 'object',
     properties: {},
