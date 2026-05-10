@@ -212,7 +212,7 @@ With this configuration, Claude Code will automatically start the MCP server whe
 Claude Code will now:
 - Automatically start the `rivanna-mcp` server when you begin a session
 - Manage the server lifecycle (no manual terminal needed)
-- Provide access to all 10 HPC tools in your prompts
+- Provide access to all 12 HPC tools in your prompts
 
 **Benefits:**
 - One less terminal to manage
@@ -221,90 +221,9 @@ Claude Code will now:
 
 ### 3. Use in your Development Environment
 
-Once configured (either running manually or via settings.json), you'll have access to 11 tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
+Once configured (either running manually or via settings.json), you'll have access to 12 tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
 
 ## Available Tools
-
-### `get_job_status`
-Query the SLURM job queue with flexible filtering.
-
-**Parameters:**
-- `state` (string, optional): Filter by job state: `all`, `RUNNING`, `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED` (default: `all`)
-- `user` (string, optional): Filter by username
-- `limit` (number, optional): Maximum number of jobs to return (default: 100)
-
-**Example Prompts:**
-- "Show me my running jobs"
-- "What jobs have failed?"
-- "How many pending jobs do I have?"
-
-### `get_node_resources`
-Get available compute nodes and their resource status.
-
-**Parameters:**
-- `partition` (string, optional): Filter by partition name (e.g., `gpu`, `standard`)
-- `detailed` (boolean, optional): Include detailed per-node information and cluster summary (default: false)
-
-**Example Prompts:**
-- "How many GPU nodes are available?"
-- "Show me detailed resource info for the standard partition"
-- "What's the status of compute nodes in the gpu partition?"
-
-### `get_storage_quota`
-Check filesystem quotas across all mounted filesystems.
-
-**Parameters:**
-- `filesystem` (string, optional): Filter by filesystem path (e.g., `/home`, `/scratch`)
-
-**Example Prompts:**
-- "How much storage am I using?"
-- "Check my quota on the home filesystem"
-- "Show me disk usage across all filesystems"
-
-### `get_directory_usage`
-Get disk usage for a specific directory.
-
-**Parameters:**
-- `path` (string, optional): Directory path to check (default: current directory)
-
-**Example Prompts:**
-- "How much space is my data directory using?"
-- "Show me the largest files in my home directory"
-- "What's the disk usage in my scratch folder?"
-
-### `get_allocation_info`
-View resource allocation limits for users and accounts.
-
-**Parameters:**
-- `user` (string, optional): Filter by username
-
-**Example Prompts:**
-- "What are my allocation limits?"
-- "Tell me about my compute hour budget"
-- "Show allocation info for user mst3k"
-
-### `get_job_accounting`
-Get job accounting and compute hour usage over a time period.
-
-**Parameters:**
-- `user` (string, optional): Filter by username
-- `days` (number, optional): Number of days to look back (default: 30)
-
-**Example Prompts:**
-- "How many compute hours have I used this month?"
-- "Show me my job accounting for the last 60 days"
-- "What's my job history?"
-
-### `get_cluster_usage_24h`
-Get cluster CPU and memory usage trends for the last 24 hours with colored ASCII graphics.
-
-**Parameters:**
-None
-
-**Example Prompts:**
-- "What's the cluster utilization looking like?"
-- "Show me the cluster usage trends for the last 24 hours"
-- "Is the cluster busy right now?"
 
 ### `submit_job`
 Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
@@ -365,6 +284,74 @@ Claude will interview you for the required parameters, recommend appropriate mod
 4. You can review it or let Claude submit it
 5. Your job files are organized in a dedicated directory
 
+### `get_cluster_usage_24h`
+Get cluster CPU and memory usage trends for the last 24 hours with colored ASCII graphics.
+
+**Parameters:**
+None
+
+**Example Prompts:**
+- "What's the cluster utilization looking like?"
+- "Show me the cluster usage trends for the last 24 hours"
+- "Is the cluster busy right now?"
+
+### `get_node_resources`
+Get available compute nodes and their resource status.
+
+**Parameters:**
+- `partition` (string, optional): Filter by partition name (e.g., `gpu`, `standard`)
+- `detailed` (boolean, optional): Include detailed per-node information and cluster summary (default: false)
+
+**Example Prompts:**
+- "How many GPU nodes are available?"
+- "Show me detailed resource info for the standard partition"
+- "What's the status of compute nodes in the gpu partition?"
+
+### `get_storage_quota`
+Check filesystem quotas across all mounted filesystems.
+
+**Parameters:**
+- `filesystem` (string, optional): Filter by filesystem path (e.g., `/home`, `/scratch`)
+
+**Example Prompts:**
+- "How much storage am I using?"
+- "Check my quota on the home filesystem"
+- "Show me disk usage across all filesystems"
+
+### `get_directory_usage`
+Get disk usage for a specific directory.
+
+**Parameters:**
+- `path` (string, optional): Directory path to check (default: current directory)
+
+**Example Prompts:**
+- "How much space is my data directory using?"
+- "Show me the largest files in my home directory"
+- "What's the disk usage in my scratch folder?"
+
+### `get_allocation_info`
+View resource allocation limits for users and accounts.
+
+**Parameters:**
+- `user` (string, optional): Filter by username
+
+**Example Prompts:**
+- "What are my allocation limits?"
+- "Tell me about my compute hour budget"
+- "Show allocation info for user mst3k"
+
+### `get_job_accounting`
+Get job accounting and compute hour usage over a time period.
+
+**Parameters:**
+- `user` (string, optional): Filter by username
+- `days` (number, optional): Number of days to look back (default: 30)
+
+**Example Prompts:**
+- "How many compute hours have I used this month?"
+- "Show me my job accounting for the last 60 days"
+- "What's my job history?"
+
 ### `cancel_job`
 Cancel a running or pending SLURM job by ID.
 
@@ -387,6 +374,19 @@ None
 - "Give me a full overview of the Rivanna cluster"
 - "What's the current state of the cluster?"
 - "Show me cluster capacity, GPU types, and 24-hour trends"
+
+### `get_job_status`
+Query the SLURM job queue with flexible filtering.
+
+**Parameters:**
+- `state` (string, optional): Filter by job state: `all`, `RUNNING`, `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED` (default: `all`)
+- `user` (string, optional): Filter by username
+- `limit` (number, optional): Maximum number of jobs to return (default: 100)
+
+**Example Prompts:**
+- "Show me my running jobs"
+- "What jobs have failed?"
+- "How many pending jobs do I have?"
 
 ### `ssh_login`
 Open an interactive SSH session directly to Rivanna's login node using your configured credentials and SSH key.
