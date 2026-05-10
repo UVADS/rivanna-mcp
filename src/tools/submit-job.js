@@ -35,6 +35,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     scriptContent,
     language = 'python', // Default to Python with miniforge
     moduleVersion,
+    filesToTransfer = [], // Array of local file paths to copy to job directory
     submit = false,
   } = options;
 
@@ -72,6 +73,21 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 
   // Create the job directory
   await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
+
+  // Transfer files to job directory
+  const transferredFiles = [];
+  if (filesToTransfer && filesToTransfer.length > 0) {
+    for (const localFile of filesToTransfer) {
+      try {
+        await sshClient.scp(localFile, jobDir);
+        // Extract just the filename for the result
+        const fileName = localFile.split('/').pop();
+        transferredFiles.push(fileName);
+      } catch (error) {
+        throw new Error(`Failed to transfer file ${localFile}: ${error.message}`);
+      }
+    }
+  }
 
   // Build module loading commands
   let moduleCommands = '';
@@ -136,6 +152,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     modulesLoaded: langConfig.moduleLoad ? true : false,
     outputFile: finalOutputPath,
     errorFile: finalErrorPath,
+    filesTransferred: transferredFiles,
     submitted: false,
   };
 
@@ -237,6 +254,14 @@ export const submitJobTool = {
         type: 'string',
         description:
           'Optional specific module version (e.g., "py310", "py311" for Python, or an R version). If omitted, uses default.',
+      },
+      filesToTransfer: {
+        type: 'array',
+        description:
+          'Optional array of local file paths to copy to the job directory. Files are transferred via SCP to login.hpc.virginia.edu',
+        items: {
+          type: 'string',
+        },
       },
     },
     required: [
