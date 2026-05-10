@@ -2,6 +2,9 @@
 
 An MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with Claude Code to give AI access to your cluster status, jobs, resources, and allocations.
 
+> **What is MCP?**
+> MCP (Model Context Protocol) is an open standard that allows AI assistants to securely access tools and data from external systems. This MCP server acts as a bridge, giving Claude Code and other AI tools direct access to Rivanna cluster commands and information.
+
 Some things you can do with this MCP:
 
 - What are my current jobs in Rivanna?
