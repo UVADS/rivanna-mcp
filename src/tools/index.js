@@ -24,6 +24,8 @@ import {
   clusterOverviewTool,
 } from './cluster-overview.js';
 import { submitJob, submitJobTool } from './submit-job.js';
+import { execCommand, execCommandTool } from './exec-command.js';
+import { sshLogin, sshLoginTool } from './ssh-login.js';
 
 const toolDefinitions = [
   [jobStatusTool, (client, args) => getJobStatus(client, args)],
@@ -35,6 +37,8 @@ const toolDefinitions = [
   [clusterUsage24hTool, (client, args) => getClusterUsage24h(client, args)],
   [clusterOverviewTool, (client, args) => getClusterOverview(client, args)],
   [submitJobTool, (client, args, config) => submitJob(client, args, config)],
+  [execCommandTool, (client, args) => execCommand(client, args)],
+  [sshLoginTool, () => sshLogin()],
 ];
 
 export const tools = toolDefinitions.map(([tool]) => tool);

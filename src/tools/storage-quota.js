@@ -5,64 +5,90 @@ export async function getStorageQuota(sshClient) {
   const usernameOutput = await sshClient.exec('whoami');
   const username = usernameOutput.trim();
 
-  // User quotas
-  const userQuotas = {
-    home: { quota: 200 * 1024 * 1024 * 1024, name: 'Home Storage (GPFS)', path: `/home/${username}` }, // 200GB
-    scratch: { quota: 10 * 1024 * 1024 * 1024 * 1024, name: 'Scratch Storage (Weka)', path: `/sfs/weka/scratch/${username}` }, // 10TB
-  };
-
-  // Get usage for each location
-  const quotas = [];
-  for (const [type, config] of Object.entries(userQuotas)) {
-    try {
-      // Get disk usage in bytes
-      const duOutput = await sshClient.exec(`du -sb ${shellQuote(config.path)} 2>/dev/null | awk '{print $1}'`);
-      const usageBytes = parseInt(duOutput.trim(), 10);
-
-      if (isNaN(usageBytes)) {
-        quotas.push({
-          name: config.name,
-          path: config.path,
-          type,
-          usage: 'N/A',
-          quota: 'N/A',
-          percentUsed: 'N/A',
-          error: 'Could not read usage',
-        });
-        continue;
-      }
-
-      // Convert bytes to human readable
-      const usageStr = formatBytes(usageBytes);
-      const quotaStr = formatBytes(config.quota);
-      const percentUsed = ((usageBytes / config.quota) * 100).toFixed(1);
-
-      quotas.push({
-        name: config.name,
-        path: config.path,
-        type,
-        usage: usageStr,
-        quota: quotaStr,
-        percentUsed: `${percentUsed}%`,
-      });
-    } catch (e) {
-      quotas.push({
-        name: config.name,
-        path: config.path,
-        type,
-        usage: 'N/A',
-        quota: 'N/A',
-        percentUsed: 'N/A',
-        error: 'Could not access storage',
-      });
-    }
+  // Get quota info from hdquota -s
+  let hdquotaOutput;
+  try {
+    hdquotaOutput = await sshClient.exec('hdquota -s 2>/dev/null');
+  } catch (e) {
+    return {
+      success: false,
+      username,
+      error: 'Could not retrieve storage quota information',
+      quotas: [],
+    };
   }
+
+  // Parse hdquota output and map to storage types
+  const quotas = parseHdquotaOutput(hdquotaOutput, username);
 
   return {
     success: true,
     username,
     quotas,
   };
+}
+
+function parseHdquotaOutput(output, username) {
+  const lines = output.trim().split('\n').filter(line => line.trim());
+  const quotas = [];
+
+  // Expected hdquota -s format (varies, but typically):
+  // Filesystem    Size    Used    Avail   Use%
+  // OR
+  // name    quota   used    available   percent
+
+  for (const line of lines) {
+    if (!line || line.match(/^\s*(Filesystem|Name|---)/i)) continue;
+
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 4) continue;
+
+    const filesystem = parts[0];
+    let quota, used, available, percentStr;
+
+    // Try to identify which columns are which
+    // Look for percentage at the end (ends with %)
+    const percentIdx = parts.findIndex(p => p.includes('%'));
+    if (percentIdx > 0) {
+      percentStr = parts[percentIdx];
+      used = parts[percentIdx - 2];
+      quota = parts[percentIdx - 3];
+      available = parts[percentIdx - 1];
+    } else {
+      quota = parts[1];
+      used = parts[2];
+      available = parts[3];
+      percentStr = parts[4];
+    }
+
+    // Determine storage type based on path
+    let type = 'other';
+    let name = `${filesystem} Storage`;
+    let path = filesystem;
+
+    if (filesystem.includes('home')) {
+      type = 'home';
+      name = 'Home Storage (GPFS)';
+      path = `/home/${username}`;
+    } else if (filesystem.includes('scratch') || filesystem.includes('weka')) {
+      type = 'scratch';
+      name = 'Scratch Storage (Weka)';
+      path = `/sfs/weka/scratch/${username}`;
+    }
+
+    quotas.push({
+      name,
+      path,
+      type,
+      filesystem,
+      quota: quota || 'N/A',
+      usage: used || 'N/A',
+      available: available || 'N/A',
+      percentUsed: percentStr || 'N/A',
+    });
+  }
+
+  return quotas;
 }
 
 function formatBytes(bytes) {

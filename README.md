@@ -7,10 +7,13 @@ Some things you can do with this MCP:
 - What are my current jobs in Rivanna?
 - Stop my job ID 1234567890.
 - How much storage have I used in Rivanna?
+- How many cores total are in Rivanna/Afton?
 - How many GPUs are available in the cluster?
 - Tell me about my allocations.
 - Give me the job history for user `mst3k` over the past `N` days.
 - Help me submit a job to Rivanna with specific resources.
+- Run this command on the cluster: ls -al $HOME/projects
+- Show me the 5 largest files in my home directory
 
 ## Installation
 
@@ -92,10 +95,6 @@ You'll be prompted for:
 
 The wizard will test the SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
 
-### 1b. (Optional) Skip Setup Wizard
-
-If you've already run setup, you can skip directly to step 2.
-
 ### 2. Configure Claude Code Integration
 
 You have two options for integrating rivanna-mcp with Claude Code:
@@ -150,9 +149,9 @@ Replace `/path/to/rivanna-mcp` with the actual path to your rivanna-mcp director
 
 With this configuration, Claude Code will automatically start the MCP server when needed and manage its lifecycle.
 
-### 3. Use in Claude Code
+### 3. Use in AI Tools
 
-Once configured (either running manually or via settings.json), you'll have access to 7 tools for monitoring and submitting jobs to your Rivanna cluster directly from Claude Code queries.
+Once configured (either running manually or via settings.json), you'll have access to 10 tools for monitoring and submitting jobs to your Rivanna cluster directly from your IDE queries.
 
 ## Available Tools
 
@@ -303,7 +302,7 @@ To automatically start rivanna-mcp when using Claude Code, add it to your projec
 Claude Code will now:
 - Automatically start the rivanna-mcp server when you begin a session
 - Manage the server lifecycle (no manual terminal needed)
-- Provide access to all 7 HPC tools in your prompts
+- Provide access to all 10 HPC tools in your prompts
 
 **Benefits:**
 - One less terminal to manage
@@ -316,14 +315,30 @@ Claude Code will now:
 
 ## Architecture
 
+### System Architecture Diagram
+
+See `mcp-architecture.excalidraw` for a detailed visual diagram showing how the components interact:
+
+- **Left**: Your IDE clients (Claude Code, Cursor, Codex, Kiro)
+- **Center**: rivanna-mcp MCP server communicating via MCP Protocol
+- **Right**: Rivanna HPC cluster with SLURM commands (squeue, sinfo, sbatch, sacct)
+
+To view the diagram:
+1. Open [Excalidraw](https://excalidraw.com)
+2. Click "Open" and upload `mcp-architecture.excalidraw`
+
+Or export it to PNG/SVG using the Excalidraw CLI or desktop app.
+
+### How It Works
+
 ```
-Claude Code
-    ↓
+Claude Code / Cursor / Codex / Kiro
+    ↓ (MCP Protocol)
 rivanna-mcp (MCP server)
-    ↓ SSH
+    ↓ (SSH)
 Rivanna Login Node
-    ↓
-SLURM (squeue, sinfo, sacct, etc.)
+    ↓ (SLURM commands)
+SLURM (squeue, sinfo, sbatch, sacct, etc.)
 ```
 
 The MCP server:
@@ -451,14 +466,17 @@ MIT
 For issues, feature requests, or contributions:
 https://github.com/uvads/rivanna-mcp/issues
 
-## Uninstalling
+## Uninstall
 
 To completely uninstall `rivanna-mcp`:
                                          
 1. Uninstall the global npm package:                                                   
-
+    ```
     npm uninstall -g rivanna-mcp
-                                                                                         
-2. Remove the configuration directory:                    
+    ```
 
-    rm -rf ~/.rivanna-mcp                                                                  
+1. Remove the configuration directory:                    
+
+    ```
+    rm -rf ~/.rivanna-mcp                             
+    ```
