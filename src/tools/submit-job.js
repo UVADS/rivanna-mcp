@@ -52,16 +52,22 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const defaultJobName = generateDefaultJobName();
   const defaultTime = '01:00:00';
   const defaultSubmit = true;
+  const defaultPartition = 'standard';
+  const defaultCpus = 4;
+  const defaultMemory = '16GB';
 
   const finalJobName = jobName || defaultJobName;
   const finalTime = time || defaultTime;
   const finalSubmit = submit !== undefined ? submit : defaultSubmit;
+  const finalPartition = partition || defaultPartition;
+  const finalCpus = cpus || defaultCpus;
+  const finalMemory = memory || defaultMemory;
 
   // Use default allocation if not provided
   const resolvedAllocation = allocation || config.defaultAllocation;
 
   // Validate required parameters
-  const required = { allocation: resolvedAllocation, partition, cpus, memory };
+  const required = { allocation: resolvedAllocation };
   const missing = Object.entries(required)
     .filter(([_, v]) => !v)
     .map(([k]) => k);
@@ -124,10 +130,10 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   let slurmScript = `#!/bin/bash
 #SBATCH --job-name=${finalJobName}
 #SBATCH --account=${resolvedAllocation}
-#SBATCH --partition=${partition}
+#SBATCH --partition=${finalPartition}
 #SBATCH --nodes=${nodes}
-#SBATCH --cpus-per-task=${cpus}
-#SBATCH --mem=${memory}
+#SBATCH --cpus-per-task=${finalCpus}
+#SBATCH --mem=${finalMemory}
 #SBATCH --time=${finalTime}
 #SBATCH --output=${finalOutputPath}
 #SBATCH --error=${finalErrorPath}`;
@@ -174,6 +180,9 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     submitted: false,
     suggestedDefaults: {
       jobName: { suggested: defaultJobName, used: finalJobName, wasDefault: !jobName },
+      partition: { suggested: defaultPartition, used: finalPartition, wasDefault: !partition },
+      cpus: { suggested: defaultCpus, used: finalCpus, wasDefault: !cpus },
+      memory: { suggested: defaultMemory, used: finalMemory, wasDefault: !memory },
       time: { suggested: defaultTime, used: finalTime, wasDefault: !time },
       submit: { suggested: defaultSubmit, used: finalSubmit, wasDefault: submit === undefined },
     },
@@ -219,17 +228,17 @@ export const submitJobTool = {
       partition: {
         type: 'string',
         description:
-          'Partition to submit to (e.g., "gpu", "parallel", "standard", "largemem")',
+          'Partition to submit to (e.g., "gpu", "parallel", "standard", "largemem") (optional: defaults to "standard")',
       },
       cpus: {
         type: 'integer',
-        description: 'Number of CPU cores to request',
+        description: 'Number of CPU cores to request (optional: defaults to 4)',
         minimum: 1,
       },
       memory: {
         type: 'string',
         description:
-          'Memory to request in format like "16GB", "32GB", or "64GB"',
+          'Memory to request in format like "16GB", "32GB", or "64GB" (optional: defaults to "16GB")',
       },
       time: {
         type: 'string',
@@ -286,11 +295,7 @@ export const submitJobTool = {
         },
       },
     },
-    required: [
-      'partition',
-      'cpus',
-      'memory',
-    ],
+    required: [],
   },
 };
 
