@@ -323,6 +323,7 @@ Create and optionally submit a SLURM job file to Rivanna with configurable resou
 - `scriptContent` (string, optional): Shell commands to execute in the job
 - `language` (string, optional): Programming environment: `"python"` (miniforge), `"r"` (with goolf), or `"none"` (default: `"python"`)
 - `moduleVersion` (string, optional): Specific module version (e.g., `"py310"`, `"py311"` for Python)
+- `filesToTransfer` (array, optional): List of local file paths to copy to the job directory via SCP (e.g., `["./script.py", "./data.csv"]`)
 - `submit` (boolean, optional): Whether to submit immediately (default: false)
 
 **Job Organization:**
@@ -331,6 +332,14 @@ Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp
 - The SLURM script
 - Job output and error logs (using SLURM's `%j` for the job ID)
 - Any supporting files (keeps `$HOME` clean)
+
+**File Transfer:**
+
+Use `filesToTransfer` to upload local files (scripts, data, configs) to the job directory:
+```
+"filesToTransfer": ["./my_script.py", "./input_data.csv", "./config.json"]
+```
+Files are transferred via SCP to `login.hpc.virginia.edu` and placed in the job directory. In your job script, reference them by filename (e.g., `python my_script.py`).
 
 **Module System:**
 
