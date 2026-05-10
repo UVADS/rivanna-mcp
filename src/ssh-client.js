@@ -7,8 +7,6 @@ class SSHClient {
     this.privateKeyPath = privateKeyPath;
   }
 
-  // Get SSH options that work reliably with Rivanna
-  // Note: StrictHostKeyChecking=accept-new provides security while auto-accepting new keys
   getSSHOptions() {
     return [
       '-i', this.privateKeyPath,
@@ -23,9 +21,7 @@ class SSHClient {
     return execCommand('ssh', args, { timeout, errorPrefix: 'SSH command failed' });
   }
 
-  async scp(localPath, remotePath, timeout = 60000) {
-    // Rivanna's SCP is broken/hangs, so use SSH piping with cat instead
-    // This is reliable and works around the SCP protocol issue
+  async transferFile(localPath, remotePath, timeout = 60000) {
     const remoteCmd = `cat > '${remotePath.replace(/'/g, "'\"'\"'")}'`;
     const args = [
       '-c',
@@ -33,10 +29,6 @@ class SSHClient {
     ];
 
     return execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
-  }
-
-  close() {
-    // No-op for compatibility
   }
 }
 

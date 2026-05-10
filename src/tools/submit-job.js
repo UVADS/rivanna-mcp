@@ -79,7 +79,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   if (filesToTransfer && filesToTransfer.length > 0) {
     for (const localFile of filesToTransfer) {
       try {
-        await sshClient.scp(localFile, jobDir);
+        await sshClient.transferFile(localFile, jobDir);
         // Extract just the filename for the result
         const fileName = localFile.split('/').pop();
         transferredFiles.push(fileName);
