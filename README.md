@@ -221,7 +221,7 @@ Claude Code will now:
 
 ### 3. Use in your Development Environment
 
-Once configured (either running manually or via settings.json), you'll have access to 10 tools for monitoring and submitting jobs to your Rivanna cluster directly from your IDE queries and prompts.
+Once configured (either running manually or via settings.json), you'll have access to 11 tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
 
 ## Available Tools
 
@@ -364,6 +364,18 @@ Claude will interview you for the required parameters, recommend appropriate mod
 3. Claude creates the SLURM script with appropriate module loading
 4. You can review it or let Claude submit it
 5. Your job files are organized in a dedicated directory
+
+### `cancel_job`
+Cancel a running or pending SLURM job by ID.
+
+**Parameters:**
+- `jobId` (string, required): The SLURM job ID to cancel (get from `get_job_status` tool)
+- `signal` (string, optional): Signal to send: `SIGTERM` (graceful, default), `SIGKILL` (force), or other UNIX signal
+
+**Example Prompts:**
+- "Cancel job 1234567"
+- "Kill job 1234567 with SIGKILL"
+- "Stop my running job"
 
 ### `get_cluster_overview`
 Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
