@@ -47,10 +47,10 @@ class SSHClient {
     const escapedRemote = escapeQuote(fullRemotePath);
 
     const sshOptions = this.getSSHOptions().join(' ');
-    // Use base64 encoding to safely pipe binary data through SSH
-    // Decode on remote end and write to file
-    const remoteCmd = `base64 -d > '${escapedRemote}'`;
-    const shellCmd = `cat '${escapedLocal}' | base64 | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
+    // Use SSH with explicit write and sync to prevent truncation
+    // The remote command reads from stdin and writes with explicit flush
+    const remoteCmd = `dd of='${escapedRemote}' && sync`;
+    const shellCmd = `cat '${escapedLocal}' | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
 
     const args = ['-c', shellCmd];
     await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
