@@ -336,6 +336,39 @@ Claude will interview you for the required parameters and can optionally submit 
 3. Claude creates the SLURM script
 4. You can review it or let Claude submit it
 
+### `get_cluster_overview`
+Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
+
+**Parameters:**
+None
+
+**Example Prompts:**
+- "Give me a full overview of the Rivanna cluster"
+- "What's the current state of the cluster?"
+- "Show me cluster capacity, GPU types, and 24-hour trends"
+
+### `ssh_login`
+Open an interactive SSH session directly to Rivanna's login node using your configured credentials and SSH key.
+
+**Parameters:**
+None
+
+**Example Prompts:**
+- "Connect me to Rivanna"
+- "Open an SSH session to the login node"
+- "Let me SSH into Rivanna"
+
+### `exec_command`
+Execute arbitrary shell commands directly on Rivanna and get the output back to your IDE.
+
+**Parameters:**
+- `command` (string, required): The shell command to execute (e.g., `"ls -al /home/nem2p/projects/"`)
+
+**Example Prompts:**
+- "Run this command on the cluster: ls -al $HOME/projects"
+- "Show me the 5 largest files in my home directory"
+- "Execute: du -sh /scratch/nem2p/* | sort -h"
+
 ## Troubleshooting
 
 ### "Configuration not found"
