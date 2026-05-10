@@ -339,13 +339,28 @@ Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp
 - Job output and error logs (using SLURM's `%j` for the job ID)
 - Any supporting files (keeps `$HOME` clean)
 
+**Auto-Detection of Project Files:**
+
+The tool automatically detects and copies:
+- All Python files (`*.py`) in your current directory
+- `Pipfile` or `requirements.txt` if present
+
+This keeps your job directory self-contained with all dependencies for execution on Rivanna.
+
+**Python Dependency Management:**
+
+If using `language: "python"`:
+- If a `Pipfile` exists: Automatically converts it to `requirements.txt` in the job script and installs dependencies via `pip`
+- If a `requirements.txt` exists: Automatically copies it to the job directory and installs dependencies via `pip`
+- Dependencies are installed during job startup, before your job script runs
+
 **File Transfer:**
 
-Use `filesToTransfer` to upload local files (scripts, data, configs) to the job directory:
+Use `filesToTransfer` to upload additional local files (data, configs) to the job directory:
 ```
-"filesToTransfer": ["./my_script.py", "./input_data.csv", "./config.json"]
+"filesToTransfer": ["./input_data.csv", "./config.json"]
 ```
-Files are transferred over SSH to `login.hpc.virginia.edu` and placed in the job directory. In your job script, reference them by filename (e.g., `python my_script.py`).
+Files are transferred over SSH to `login.hpc.virginia.edu` and placed in the job directory. In your job script, reference them by filename (e.g., `python my_script.py input_data.csv`).
 
 **Module System:**
 
