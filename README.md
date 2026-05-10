@@ -225,64 +225,16 @@ Once configured (either running manually or via settings.json), you'll have acce
 
 ## Available Tools
 
-### `submit_job`
-Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
+### `get_cluster_overview`
+Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
 
 **Parameters:**
-- `jobName` (string, required): Name for the job (alphanumeric, underscores/hyphens OK)
-- `allocation` (string, required): Account/allocation to charge compute hours to
-- `partition` (string, required): Partition to submit to (`gpu`, `parallel`, `standard`, `largemem`)
-- `cpus` (integer, required): Number of CPU cores to request
-- `memory` (string, required): Memory to request (e.g., `"16GB"`, `"32GB"`, `"64GB"`)
-- `time` (string, required): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
-- `nodes` (integer, optional): Number of compute nodes (default: 1)
-- `gpus` (string, optional): Number of GPUs per node (only for gpu partition)
-- `outputPath` (string, optional): Path for stdout output file (default: job directory)
-- `errorPath` (string, optional): Path for stderr output file (default: job directory)
-- `scriptContent` (string, optional): Shell commands to execute in the job
-- `language` (string, optional): Programming environment: `"python"` (miniforge), `"r"` (with goolf), or `"none"` (default: `"python"`)
-- `moduleVersion` (string, optional): Specific module version (e.g., `"py310"`, `"py311"` for Python)
-- `filesToTransfer` (array, optional): List of local file paths to copy to the job directory (e.g., `["./script.py", "./data.csv"]`)
-- `submit` (boolean, optional): Whether to submit immediately (default: false)
+None
 
-**Job Organization:**
-
-Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp/`) containing:
-- The SLURM script
-- Job output and error logs (using SLURM's `%j` for the job ID)
-- Any supporting files (keeps `$HOME` clean)
-
-**File Transfer:**
-
-Use `filesToTransfer` to upload local files (scripts, data, configs) to the job directory:
-```
-"filesToTransfer": ["./my_script.py", "./input_data.csv", "./config.json"]
-```
-Files are transferred over SSH to `login.hpc.virginia.edu` and placed in the job directory. In your job script, reference them by filename (e.g., `python my_script.py`).
-
-**Module System:**
-
-The tool automatically loads the appropriate Rivanna modules:
-- **Python** (default): Loads `module load miniforge` with Python 3.12 by default. Use `moduleVersion` for other versions (e.g., `"py310"`, `"py311"`)
-- **R**: Loads `module load goolf R` (goolf is required as a dependency). Use `module spider R` on Rivanna to discover available R versions
-- **None**: Skips module loading for custom environments
-
-**Usage in Claude Code:**
-
-Claude Code can guide you through job creation interactively. Just ask:
-
-```
-I want to submit a Python job to Rivanna that processes data
-```
-
-Claude will interview you for the required parameters, recommend appropriate modules, and optionally submit the job.
-
-**Example workflow:**
-1. Claude asks about your allocation, partition, resource needs, and language preference
-2. You provide answers
-3. Claude creates the SLURM script with appropriate module loading
-4. You can review it or let Claude submit it
-5. Your job files are organized in a dedicated directory
+**Example Prompts:**
+- "Give me a full overview of the Rivanna cluster"
+- "What's the current state of the cluster?"
+- "Show me cluster capacity, GPU types, and 24-hour trends"
 
 ### `get_cluster_usage_24h`
 Get cluster CPU and memory usage trends for the last 24 hours with colored ASCII graphics.
@@ -352,28 +304,64 @@ Get job accounting and compute hour usage over a time period.
 - "Show me my job accounting for the last 60 days"
 - "What's my job history?"
 
-### `cancel_job`
-Cancel a running or pending SLURM job by ID.
+### `submit_job`
+Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
 
 **Parameters:**
-- `jobId` (string, required): The SLURM job ID to cancel (get from `get_job_status` tool)
-- `signal` (string, optional): Signal to send: `SIGTERM` (graceful, default), `SIGKILL` (force), or other UNIX signal
+- `jobName` (string, required): Name for the job (alphanumeric, underscores/hyphens OK)
+- `allocation` (string, required): Account/allocation to charge compute hours to
+- `partition` (string, required): Partition to submit to (`gpu`, `parallel`, `standard`, `largemem`)
+- `cpus` (integer, required): Number of CPU cores to request
+- `memory` (string, required): Memory to request (e.g., `"16GB"`, `"32GB"`, `"64GB"`)
+- `time` (string, required): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
+- `nodes` (integer, optional): Number of compute nodes (default: 1)
+- `gpus` (string, optional): Number of GPUs per node (only for gpu partition)
+- `outputPath` (string, optional): Path for stdout output file (default: job directory)
+- `errorPath` (string, optional): Path for stderr output file (default: job directory)
+- `scriptContent` (string, optional): Shell commands to execute in the job
+- `language` (string, optional): Programming environment: `"python"` (miniforge), `"r"` (with goolf), or `"none"` (default: `"python"`)
+- `moduleVersion` (string, optional): Specific module version (e.g., `"py310"`, `"py311"` for Python)
+- `filesToTransfer` (array, optional): List of local file paths to copy to the job directory (e.g., `["./script.py", "./data.csv"]`)
+- `submit` (boolean, optional): Whether to submit immediately (default: false)
 
-**Example Prompts:**
-- "Cancel job 1234567"
-- "Kill job 1234567 with SIGKILL"
-- "Stop my running job"
+**Job Organization:**
 
-### `get_cluster_overview`
-Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
+Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp/`) containing:
+- The SLURM script
+- Job output and error logs (using SLURM's `%j` for the job ID)
+- Any supporting files (keeps `$HOME` clean)
 
-**Parameters:**
-None
+**File Transfer:**
 
-**Example Prompts:**
-- "Give me a full overview of the Rivanna cluster"
-- "What's the current state of the cluster?"
-- "Show me cluster capacity, GPU types, and 24-hour trends"
+Use `filesToTransfer` to upload local files (scripts, data, configs) to the job directory:
+```
+"filesToTransfer": ["./my_script.py", "./input_data.csv", "./config.json"]
+```
+Files are transferred over SSH to `login.hpc.virginia.edu` and placed in the job directory. In your job script, reference them by filename (e.g., `python my_script.py`).
+
+**Module System:**
+
+The tool automatically loads the appropriate Rivanna modules:
+- **Python** (default): Loads `module load miniforge` with Python 3.12 by default. Use `moduleVersion` for other versions (e.g., `"py310"`, `"py311"`)
+- **R**: Loads `module load goolf R` (goolf is required as a dependency). Use `module spider R` on Rivanna to discover available R versions
+- **None**: Skips module loading for custom environments
+
+**Usage in Claude Code:**
+
+Claude Code can guide you through job creation interactively. Just ask:
+
+```
+I want to submit a Python job to Rivanna that processes data
+```
+
+Claude will interview you for the required parameters, recommend appropriate modules, and optionally submit the job.
+
+**Example workflow:**
+1. Claude asks about your allocation, partition, resource needs, and language preference
+2. You provide answers
+3. Claude creates the SLURM script with appropriate module loading
+4. You can review it or let Claude submit it
+5. Your job files are organized in a dedicated directory
 
 ### `get_job_status`
 Query the SLURM job queue with flexible filtering.
@@ -387,6 +375,18 @@ Query the SLURM job queue with flexible filtering.
 - "Show me my running jobs"
 - "What jobs have failed?"
 - "How many pending jobs do I have?"
+
+### `cancel_job`
+Cancel a running or pending SLURM job by ID.
+
+**Parameters:**
+- `jobId` (string, required): The SLURM job ID to cancel (get from `get_job_status` tool)
+- `signal` (string, optional): Signal to send: `SIGTERM` (graceful, default), `SIGKILL` (force), or other UNIX signal
+
+**Example Prompts:**
+- "Cancel job 1234567"
+- "Kill job 1234567 with SIGKILL"
+- "Stop my running job"
 
 ### `ssh_login`
 Open an interactive SSH session directly to Rivanna's login node using your configured credentials and SSH key.
