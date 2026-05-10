@@ -258,7 +258,7 @@ export const submitJobTool = {
       filesToTransfer: {
         type: 'array',
         description:
-          'Optional array of local file paths to copy to the job directory. Files are transferred via SCP to login.hpc.virginia.edu',
+          'Optional array of local file paths to copy to the job directory. Files are transferred via SFTP to login.hpc.virginia.edu',
         items: {
           type: 'string',
         },

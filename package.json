@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "inquirer": "^9.3.8"
+    "inquirer": "^9.3.8",
+    "ssh2": "^1.17.0"
   },
   "engines": {
     "node": ">=18.0.0"
