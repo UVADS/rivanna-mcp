@@ -219,49 +219,6 @@ Claude Code will now:
 - Server starts automatically with your project
 - Cleaner workflow within Claude Code
 
-#### Option C: System Lifecycle Management with LaunchD (macOS)
-
-For automatic system-level management of rivanna-mcp across all your IDEs and terminals, set up the launchd lifecycle manager:
-
-```bash
-~/.config/launchd/rivanna-mcp.sh install
-```
-
-This installs a system service that:
-- **Auto-starts on login** — rivanna-mcp runs automatically when you log in
-- **Prevents duplicates** — Automatically kills any stale instances
-- **Auto-restarts on crash** — If the process dies, it automatically restarts
-- **Idle timeout** — Exits cleanly after 5 minutes with no activity (saves resources)
-- **Auto-reconnect** — Restarts automatically when Claude Code connects
-
-**Service Management:**
-
-```bash
-# Check status
-~/.config/launchd/rivanna-mcp.sh status
-
-# View logs
-~/.config/launchd/rivanna-mcp.sh logs
-
-# Restart service
-~/.config/launchd/rivanna-mcp.sh restart
-
-# Stop temporarily
-~/.config/launchd/rivanna-mcp.sh stop
-
-# Remove service
-~/.config/launchd/rivanna-mcp.sh uninstall
-```
-
-See [LAUNCHD_SETUP.md](./LAUNCHD_SETUP.md) for detailed documentation and troubleshooting.
-
-**Benefits:**
-- Single instance guaranteed across all terminals and IDEs
-- No duplicate processes
-- Automatic cleanup on idle
-- System-level management (persists across Claude Code sessions)
-- Resource-efficient (exits when not in use)
-
 ### 3. Use in your Development Environment
 
 Once configured (either running manually or via settings.json), you'll have access to 12 tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
