@@ -42,16 +42,13 @@ class SSHClient {
       fullRemotePath = remotePath.endsWith('/') ? `${remotePath}${localFileName}` : `${remotePath}/${localFileName}`;
     }
 
-    // Build SFTP command with SSH options
-    const sshOpts = this.getSSHOptions().map(opt => `-o${opt}`).join(' ');
-    const sftpCmd = `put "${localPath.replace(/"/g, '\\"')}" "${fullRemotePath.replace(/"/g, '\\"')}"`;
-    const shellCmd = `echo '${sftpCmd}' | sftp ${sshOpts} ${this.username}@${this.host}`;
-
-    const args = ['-c', shellCmd];
-    await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
+    // Use scp with SSH options for direct file transfer
+    const sshOptions = this.getSSHOptions();
+    const args = [...sshOptions, '-C', localPath, `${this.username}@${this.host}:${fullRemotePath}`];
+    await execCommand('scp', args, { timeout, errorPrefix: 'File transfer failed' });
 
     // Verify file transfer by comparing file sizes
-    const remoteSize = await this.exec(`wc -c < "${fullRemotePath.replace(/"/g, '\\"')}" | tr -d ' '`);
+    const remoteSize = await this.exec(`wc -c < '${fullRemotePath.replace(/'/g, "'\\''")}'`);
     const remoteSizeBytes = parseInt(remoteSize.trim(), 10);
 
     if (remoteSizeBytes !== localFileSize) {
