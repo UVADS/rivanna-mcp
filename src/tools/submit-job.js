@@ -1,5 +1,6 @@
 import { shellQuote } from '../utils.js';
-import { basename } from 'path';
+import { basename, resolve } from 'path';
+import { promises as fs } from 'fs';
 
 // Module system configuration for Rivanna
 // Defines default module loading commands for common languages/environments
@@ -27,6 +28,51 @@ function generateDefaultJobName() {
   // Generate 6 random alphanumeric chars
   const randomChars = Math.random().toString(36).substring(2, 8);
   return `${dirName}-${randomChars}`;
+}
+
+async function findPythonFiles(cwd) {
+  const files = [];
+  try {
+    const entries = await fs.readdir(cwd);
+    for (const entry of entries) {
+      if (entry.endsWith('.py')) {
+        files.push(resolve(cwd, entry));
+      }
+    }
+  } catch (error) {
+    // Directory read failed, return empty
+  }
+  return files;
+}
+
+async function handlePythonDependencies(cwd) {
+  const depInfo = {
+    hasRequirements: false,
+    hasPipfile: false,
+    requirementsPath: null,
+    pipfilePath: null,
+  };
+
+  const requirementsPath = resolve(cwd, 'requirements.txt');
+  const pipfilePath = resolve(cwd, 'Pipfile');
+
+  try {
+    await fs.access(requirementsPath);
+    depInfo.hasRequirements = true;
+    depInfo.requirementsPath = requirementsPath;
+  } catch {
+    // requirements.txt doesn't exist
+  }
+
+  try {
+    await fs.access(pipfilePath);
+    depInfo.hasPipfile = true;
+    depInfo.pipfilePath = pipfilePath;
+  } catch {
+    // Pipfile doesn't exist
+  }
+
+  return depInfo;
 }
 
 export async function submitJob(sshClient, options = {}, config = {}) {
@@ -98,18 +144,30 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   // Create the job directory
   await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
 
+  // Auto-detect Python files and dependencies
+  const cwd = process.cwd();
+  const pythonFiles = await findPythonFiles(cwd);
+  const depInfo = await handlePythonDependencies(cwd);
+
+  // Combine user-specified files with auto-detected Python files
+  const allFilesToTransfer = new Set([...filesToTransfer, ...pythonFiles]);
+  if (depInfo.hasRequirements) {
+    allFilesToTransfer.add(depInfo.requirementsPath);
+  }
+  if (depInfo.hasPipfile) {
+    allFilesToTransfer.add(depInfo.pipfilePath);
+  }
+
   // Transfer files to job directory
   const transferredFiles = [];
-  if (filesToTransfer && filesToTransfer.length > 0) {
-    for (const localFile of filesToTransfer) {
-      try {
-        await sshClient.transferFile(localFile, jobDir);
-        // Extract just the filename for the result
-        const fileName = localFile.split('/').pop();
-        transferredFiles.push(fileName);
-      } catch (error) {
-        throw new Error(`Failed to transfer file ${localFile}: ${error.message}`);
-      }
+  for (const localFile of allFilesToTransfer) {
+    try {
+      await sshClient.transferFile(localFile, jobDir);
+      // Extract just the filename for the result
+      const fileName = localFile.split('/').pop();
+      transferredFiles.push(fileName);
+    } catch (error) {
+      throw new Error(`Failed to transfer file ${localFile}: ${error.message}`);
     }
   }
 
@@ -145,6 +203,18 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   slurmScript += '\n\n# Load Rivanna modules\n';
   slurmScript += moduleCommands || '# No modules loaded\n';
 
+  // Handle Python dependencies
+  if (language === 'python') {
+    if (depInfo.hasPipfile) {
+      slurmScript += '\n# Convert Pipfile to requirements.txt\n';
+      slurmScript += 'pipenv requirements > requirements.txt 2>/dev/null || pipenv requirements --dev > requirements.txt 2>/dev/null || echo "# Pipfile conversion failed, using empty requirements" > requirements.txt\n';
+    }
+    if (depInfo.hasRequirements || depInfo.hasPipfile) {
+      slurmScript += '\n# Install Python dependencies\n';
+      slurmScript += 'pip install -r requirements.txt\n';
+    }
+  }
+
   slurmScript += '\n# Job commands below:\n';
   if (scriptContent) {
     slurmScript += scriptContent;
@@ -177,6 +247,11 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     outputFile: finalOutputPath,
     errorFile: finalErrorPath,
     filesTransferred: transferredFiles,
+    autoDetected: {
+      pythonFiles: pythonFiles.length,
+      hasPipfile: depInfo.hasPipfile,
+      hasRequirements: depInfo.hasRequirements,
+    },
     submitted: false,
     suggestedDefaults: {
       jobName: { suggested: defaultJobName, used: finalJobName, wasDefault: !jobName },
