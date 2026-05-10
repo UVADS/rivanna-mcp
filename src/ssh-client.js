@@ -22,9 +22,9 @@ class SSHClient {
     return execCommand('ssh', args, { timeout, errorPrefix: 'SSH command failed' });
   }
 
-  async transferFile(localPath, remotePath, timeout = 60000) {
-    // Use base64 encoding with SSH piping for reliable binary-safe transfer
-    // Avoids truncation issues with direct piping and handles all file types
+  async transferFile(localPath, remotePath, timeout = 120000) {
+    // Use SFTP for reliable file transfer (proper binary-safe protocol)
+    // Avoids SSH piping truncation issues by using dedicated file transfer protocol
     // Verifies transfer by comparing local and remote file sizes
 
     // Get local file size for verification
@@ -42,21 +42,16 @@ class SSHClient {
       fullRemotePath = remotePath.endsWith('/') ? `${remotePath}${localFileName}` : `${remotePath}/${localFileName}`;
     }
 
-    const escapeQuote = (str) => str.replace(/'/g, "'\"'\"'");
-    const escapedLocal = escapeQuote(localPath);
-    const escapedRemote = escapeQuote(fullRemotePath);
-
-    const sshOptions = this.getSSHOptions().join(' ');
-    // Use SSH with explicit write and sync to prevent truncation
-    // The remote command reads from stdin and writes with explicit flush
-    const remoteCmd = `dd of='${escapedRemote}' && sync`;
-    const shellCmd = `cat '${escapedLocal}' | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
+    // Build SFTP command with SSH options
+    const sshOpts = this.getSSHOptions().map(opt => `-o${opt}`).join(' ');
+    const sftpCmd = `put "${localPath.replace(/"/g, '\\"')}" "${fullRemotePath.replace(/"/g, '\\"')}"`;
+    const shellCmd = `echo '${sftpCmd}' | sftp ${sshOpts} ${this.username}@${this.host}`;
 
     const args = ['-c', shellCmd];
     await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
 
     // Verify file transfer by comparing file sizes
-    const remoteSize = await this.exec(`wc -c < '${escapedRemote}' | tr -d ' '`);
+    const remoteSize = await this.exec(`wc -c < "${fullRemotePath.replace(/"/g, '\\"')}" | tr -d ' '`);
     const remoteSizeBytes = parseInt(remoteSize.trim(), 10);
 
     if (remoteSizeBytes !== localFileSize) {
