@@ -23,35 +23,57 @@ Some things you can do with this MCP:
 - `git` installed (for GitHub-based installation)
 - SSH access enabled if working remotely.
 
-### Quick Install (with Claude Code Integration)
+### Install for Your Client
 
-One command to install globally AND hook into Claude Code:
-
+Install globally first:
 ```bash
-npm install -g github:uvads/rivanna-mcp && claude mcp add rivanna-mcp -- npx -y rivanna-mcp
+npm install -g github:uvads/rivanna-mcp && rivanna-mcp setup
 ```
 
-Then run setup once:
+Then choose your client below:
+
+#### Claude Code
 ```bash
-rivanna-mcp setup
+claude mcp add rivanna-mcp -- npx -y rivanna-mcp
 ```
 
-### Standard Install
-
-Install globally from GitHub:
-
-```bash
-npm install -g github:uvads/rivanna-mcp
+#### Codex
+Add to your Codex configuration file (typically `~/.codex/config.json` or via Codex settings):
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "rivanna-mcp",
+      "args": []
+    }
+  }
+}
 ```
 
-Then manually add to `.claude/settings.json` (see Configuration section below).
+#### Cursor
+Add to `.cursor/settings.json` in your project directory:
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "rivanna-mcp",
+      "args": []
+    }
+  }
+}
+```
 
-### Local Install (for development)
-
-```bash
-git clone https://github.com/uvads/rivanna-mcp.git
-cd rivanna-mcp
-npm install
+#### Kiro
+Add to your Kiro configuration (via Kiro settings or `~/.kiro/config.json`):
+```json
+{
+  "mcpServers": {
+    "rivanna-mcp": {
+      "command": "rivanna-mcp",
+      "args": []
+    }
+  }
+}
 ```
 
 ## Quick Start
