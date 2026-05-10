@@ -365,9 +365,9 @@ Execute arbitrary shell commands directly on Rivanna and get the output back to 
 - `command` (string, required): The shell command to execute (e.g., `"ls -al /home/nem2p/projects/"`)
 
 **Example Prompts:**
-- "Run this command on the cluster: ls -al $HOME/projects"
+- "Run this command on the cluster: `ls -al $HOME/projects`"
 - "Show me the 5 largest files in my home directory"
-- "Execute: du -sh /scratch/nem2p/* | sort -h"
+- "Execute: `du -sh /scratch/nem2p/* | sort -h`"
 
 ## Troubleshooting
 
@@ -413,11 +413,13 @@ rivanna-mcp setup
 
 This is expected if Rivanna hasn't upgraded to support post-quantum algorithms yet. The client will automatically fall back to secure alternatives. No action needed.
 
-## Security Considerations
+## Security
+
+This MCP server runs locally on your machine. No history or information about your interactions are stored outside of your local environment.
 
 - **SSH Keys**: Only stored locally in your filesystem
 - **Credentials**: Never transmitted outside SSH tunnels
-- **Configuration**: Stored locally in `~/.rivanna-mcp/` (not in git)
+- **Configuration**: Stored locally in `~/.rivanna-mcp/` (not in `git`)
 - **Best Practice**: Use SSH key-based authentication with a strong passphrase
 
 ## License
