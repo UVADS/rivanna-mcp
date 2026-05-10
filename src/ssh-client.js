@@ -25,9 +25,21 @@ class SSHClient {
     // Use SSH piping with cat for reliable file transfer
     // Avoids rsync spawn issues and Rivanna's SCP hang problem
     // Properly escapes single quotes in paths
+
+    // Extract filename from local path
+    const localFileName = localPath.split('/').pop();
+
+    // If remotePath is a directory (doesn't contain a dot for file extension),
+    // append the filename to create the full remote file path
+    let fullRemotePath = remotePath;
+    if (!remotePath.includes('.') && !remotePath.endsWith(localFileName)) {
+      // Treat as directory - append filename
+      fullRemotePath = remotePath.endsWith('/') ? `${remotePath}${localFileName}` : `${remotePath}/${localFileName}`;
+    }
+
     const escapeQuote = (str) => str.replace(/'/g, "'\"'\"'");
     const escapedLocal = escapeQuote(localPath);
-    const escapedRemote = escapeQuote(remotePath);
+    const escapedRemote = escapeQuote(fullRemotePath);
 
     const sshOptions = this.getSSHOptions().join(' ');
     const remoteCmd = `cat > '${escapedRemote}'`;
