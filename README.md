@@ -341,18 +341,29 @@ Each job submission creates its own directory (`~/rivanna-jobs/jobname_timestamp
 
 **Auto-Detection of Project Files:**
 
-The tool automatically detects and copies:
+The tool automatically detects and copies language-specific files from your project:
+
+**Python projects:**
 - All Python files (`*.py`) in your current directory
 - `Pipfile` or `requirements.txt` if present
 
-This keeps your job directory self-contained with all dependencies for execution on Rivanna.
+**R projects:**
+- All R files (`*.R` or `*.r`) in your current directory
+- `renv.lock` (R environment snapshot) or `DESCRIPTION` (R package metadata) if present
 
-**Python Dependency Management:**
+This keeps your job directory self-contained with all code and dependencies for execution on Rivanna.
 
-If using `language: "python"`:
+**Dependency Management:**
+
+**Python (`language: "python"):**
 - If a `Pipfile` exists: Automatically converts it to `requirements.txt` in the job script and installs dependencies via `pip`
-- If a `requirements.txt` exists: Automatically copies it to the job directory and installs dependencies via `pip`
-- Dependencies are installed during job startup, before your job script runs
+- If a `requirements.txt` exists: Automatically copies it and installs dependencies via `pip`
+
+**R (`language: "r"):**
+- If `renv.lock` exists: Automatically restores the R environment using `renv::restore()`
+- If `DESCRIPTION` exists: Automatically installs package dependencies using `devtools::install_deps()`
+
+Dependencies are installed during job startup, before your job script runs.
 
 **File Transfer:**
 
