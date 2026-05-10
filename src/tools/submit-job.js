@@ -231,10 +231,12 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 
   // Handle dependencies based on language
   if (language === 'python') {
+    // Pipfile takes precedence: convert to requirements.txt if present
     if (depInfo.hasPipfile) {
       slurmScript += '\n# Convert Pipfile to requirements.txt\n';
       slurmScript += 'pipenv requirements > requirements.txt 2>/dev/null || pipenv requirements --dev > requirements.txt 2>/dev/null || echo "# Pipfile conversion failed, using empty requirements" > requirements.txt\n';
     }
+    // Install dependencies: uses requirements.txt (whether from Pipfile conversion or directly)
     if (depInfo.hasRequirements || depInfo.hasPipfile) {
       slurmScript += '\n# Install Python dependencies\n';
       slurmScript += 'pip install -r requirements.txt\n';
