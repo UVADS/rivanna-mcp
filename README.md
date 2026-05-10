@@ -15,6 +15,53 @@ Some things you can do with this MCP:
 - Run this command on the cluster: ls -al $HOME/projects
 - Show me the 5 largest files in my home directory
 
+## Architecture
+
+### System Architecture Diagram
+
+```mermaid
+graph LR
+    Claude["Claude Code"] -->|MCP Protocol| MCP["rivanna-mcp<br/>MCP Server"]
+    Cursor["Cursor"] -->|MCP Protocol| MCP
+    Codex["Codex"] -->|MCP Protocol| MCP
+    Kiro["Kiro"] -->|MCP Protocol| MCP
+    
+    MCP -->|SSH| Rivanna["Rivanna<br/>Login Node"]
+    
+    Rivanna -->|squeue| SQueue["Job Status"]
+    Rivanna -->|sinfo| SInfo["Node Resources"]
+    Rivanna -->|sbatch| SBatch["Job Submission"]
+    Rivanna -->|sacct| SAckt["Job Accounting"]
+    
+    style Claude fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Cursor fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Codex fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style Kiro fill:#60a5fa,stroke:#1e3a5f,color:#fff
+    style MCP fill:#3b82f6,stroke:#1e3a5f,color:#fff
+    style Rivanna fill:#3b82f6,stroke:#1e3a5f,color:#fff
+    style SQueue fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SInfo fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SBatch fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SAckt fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+```
+
+**How It Works:**
+
+The MCP server acts as a bridge between your IDE and Rivanna:
+
+1. **IDE Clients** (left): Claude Code, Cursor, Codex, Kiro connect via MCP Protocol
+2. **MCP Server** (center): Receives queries and translates them to SLURM commands
+3. **SSH Connection**: Securely tunnels to Rivanna's login node
+4. **SLURM Commands**: Executes job queries and submissions on the cluster
+
+The MCP server:
+- Spawns native SSH processes for each command execution
+- Parses SLURM command output into structured data
+- Returns results via the MCP protocol
+- Supports post-quantum key exchange algorithms for enhanced security
+
+For a detailed visual diagram, see `mcp-architecture.excalidraw` (open in [Excalidraw.com](https://excalidraw.com))
+
 ## Installation
 
 ### Prerequisites
@@ -312,53 +359,6 @@ Claude Code will now:
 **Requirements:**
 - rivanna-mcp must be installed globally (`npm install -g github:uvads/rivanna-mcp`)
 - Configuration from `rivanna-mcp setup` must exist at `~/.rivanna-mcp/config.json`
-
-## Architecture
-
-### System Architecture Diagram
-
-```mermaid
-graph LR
-    Claude["Claude Code"] -->|MCP Protocol| MCP["rivanna-mcp<br/>MCP Server"]
-    Cursor["Cursor"] -->|MCP Protocol| MCP
-    Codex["Codex"] -->|MCP Protocol| MCP
-    Kiro["Kiro"] -->|MCP Protocol| MCP
-    
-    MCP -->|SSH| Rivanna["Rivanna<br/>Login Node"]
-    
-    Rivanna -->|squeue| SQueue["Job Status"]
-    Rivanna -->|sinfo| SInfo["Node Resources"]
-    Rivanna -->|sbatch| SBatch["Job Submission"]
-    Rivanna -->|sacct| SAckt["Job Accounting"]
-    
-    style Claude fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Cursor fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Codex fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Kiro fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style MCP fill:#3b82f6,stroke:#1e3a5f,color:#fff
-    style Rivanna fill:#3b82f6,stroke:#1e3a5f,color:#fff
-    style SQueue fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
-    style SInfo fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
-    style SBatch fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
-    style SAckt fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
-```
-
-**How It Works:**
-
-The MCP server acts as a bridge between your IDE and Rivanna:
-
-1. **IDE Clients** (left): Claude Code, Cursor, Codex, Kiro connect via MCP Protocol
-2. **MCP Server** (center): Receives queries and translates them to SLURM commands
-3. **SSH Connection**: Securely tunnels to Rivanna's login node
-4. **SLURM Commands**: Executes job queries and submissions on the cluster
-
-The MCP server:
-- Spawns native SSH processes for each command execution
-- Parses SLURM command output into structured data
-- Returns results via the MCP protocol
-- Supports post-quantum key exchange algorithms for enhanced security
-
-For a detailed visual diagram, see `mcp-architecture.excalidraw` (open in [Excalidraw.com](https://excalidraw.com))
 
 ## Development
 
