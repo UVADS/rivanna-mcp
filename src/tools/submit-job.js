@@ -1,4 +1,5 @@
 import { shellQuote } from '../utils.js';
+import { basename } from 'path';
 
 // Module system configuration for Rivanna
 // Defines default module loading commands for common languages/environments
@@ -20,6 +21,14 @@ const LANGUAGE_MODULES = {
   },
 };
 
+function generateDefaultJobName() {
+  // Get current directory basename (e.g., "rivanna-work" from /path/to/rivanna-work)
+  const dirName = basename(process.cwd()).replace(/[^a-z0-9-]/gi, '').toLowerCase();
+  // Generate 6 random alphanumeric chars
+  const randomChars = Math.random().toString(36).substring(2, 8);
+  return `${dirName}-${randomChars}`;
+}
+
 export async function submitJob(sshClient, options = {}, config = {}) {
   const {
     jobName,
@@ -36,17 +45,26 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     language = 'python', // Default to Python with miniforge
     moduleVersion,
     filesToTransfer = [], // Array of local file paths to copy to job directory
-    submit = false,
+    submit,
   } = options;
+
+  // Apply sensible defaults
+  const defaultJobName = generateDefaultJobName();
+  const defaultTime = '01:00:00';
+  const defaultSubmit = true;
+
+  const finalJobName = jobName || defaultJobName;
+  const finalTime = time || defaultTime;
+  const finalSubmit = submit !== undefined ? submit : defaultSubmit;
 
   // Use default allocation if not provided
   const resolvedAllocation = allocation || config.defaultAllocation;
 
   // Validate required parameters
-  const required = { jobName, resolvedAllocation, partition, cpus, memory, time };
+  const required = { allocation: resolvedAllocation, partition, cpus, memory };
   const missing = Object.entries(required)
     .filter(([_, v]) => !v)
-    .map(([k]) => k === 'resolvedAllocation' ? 'allocation' : k);
+    .map(([k]) => k);
 
   if (missing.length > 0) {
     throw new Error(
@@ -68,7 +86,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   // Create a per-job directory to keep $HOME clean
   // Format: ~/rivanna-jobs/jobname_timestamp/
   const timestamp = Date.now();
-  const jobDirName = `${jobName}_${timestamp}`;
+  const jobDirName = `${finalJobName}_${timestamp}`;
   const jobDir = `${homePath}/rivanna-jobs/${jobDirName}`;
 
   // Create the job directory
@@ -104,13 +122,13 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const finalErrorPath = errorPath || `${jobDir}/%j.err`;
 
   let slurmScript = `#!/bin/bash
-#SBATCH --job-name=${jobName}
+#SBATCH --job-name=${finalJobName}
 #SBATCH --account=${resolvedAllocation}
 #SBATCH --partition=${partition}
 #SBATCH --nodes=${nodes}
 #SBATCH --cpus-per-task=${cpus}
 #SBATCH --mem=${memory}
-#SBATCH --time=${time}
+#SBATCH --time=${finalTime}
 #SBATCH --output=${finalOutputPath}
 #SBATCH --error=${finalErrorPath}`;
 
@@ -129,7 +147,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   }
 
   // Create job file in the job-specific directory
-  const jobFileName = `${jobName}.slurm`;
+  const jobFileName = `${finalJobName}.slurm`;
   const jobFilePath = `${jobDir}/${jobFileName}`;
 
   // Write the job file
@@ -154,9 +172,14 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     errorFile: finalErrorPath,
     filesTransferred: transferredFiles,
     submitted: false,
+    suggestedDefaults: {
+      jobName: { suggested: defaultJobName, used: finalJobName, wasDefault: !jobName },
+      time: { suggested: defaultTime, used: finalTime, wasDefault: !time },
+      submit: { suggested: defaultSubmit, used: finalSubmit, wasDefault: submit === undefined },
+    },
   };
 
-  if (submit) {
+  if (finalSubmit) {
     try {
       const submitOutput = await sshClient.exec(`sbatch ${shellQuote(jobFilePath)}`);
       const jobIdMatch = submitOutput.match(/Submitted batch job (\d+)/);
@@ -180,13 +203,13 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 export const submitJobTool = {
   name: 'submit_job',
   description:
-    'Create and optionally submit a SLURM job file to Rivanna with configurable resources and parameters. If no allocation is specified, uses the default allocation from setup.',
+    'Create and optionally submit a SLURM job file to Rivanna with configurable resources and parameters. Default values: job name uses project folder name + 6 random chars, walltime limit 1 hour, submit immediately set to YES. These are suggested but can be overridden during the interview.',
   inputSchema: {
     type: 'object',
     properties: {
       jobName: {
         type: 'string',
-        description: 'Name for the SLURM job (alphanumeric, underscores/hyphens OK)',
+        description: 'Name for the SLURM job (optional: defaults to project-folder-XXXXXX with 6 random alphanumeric chars)',
       },
       allocation: {
         type: 'string',
@@ -210,7 +233,7 @@ export const submitJobTool = {
       },
       time: {
         type: 'string',
-        description: 'Walltime limit in HH:MM:SS format (e.g., "01:00:00")',
+        description: 'Walltime limit in HH:MM:SS format (optional: defaults to "01:00:00" / 1 hour)',
       },
       nodes: {
         type: 'integer',
@@ -240,8 +263,7 @@ export const submitJobTool = {
       },
       submit: {
         type: 'boolean',
-        description: 'Whether to submit the job immediately to SLURM (default: false)',
-        default: false,
+        description: 'Whether to submit the job immediately to SLURM (default: true)',
       },
       language: {
         type: 'string',
@@ -265,11 +287,9 @@ export const submitJobTool = {
       },
     },
     required: [
-      'jobName',
       'partition',
       'cpus',
       'memory',
-      'time',
     ],
   },
 };
