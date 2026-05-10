@@ -1,4 +1,5 @@
 import { execCommand } from './command-runner.js';
+import { statSync } from 'fs';
 
 class SSHClient {
   constructor(host = 'login.hpc.virginia.edu', username, privateKeyPath) {
@@ -25,6 +26,11 @@ class SSHClient {
     // Use SSH piping with cat for reliable file transfer
     // Avoids rsync spawn issues and Rivanna's SCP hang problem
     // Properly escapes single quotes in paths
+    // Verifies transfer by comparing local and remote file sizes
+
+    // Get local file size for verification
+    const localStats = statSync(localPath);
+    const localFileSize = localStats.size;
 
     // Extract filename from local path
     const localFileName = localPath.split('/').pop();
@@ -46,7 +52,20 @@ class SSHClient {
     const shellCmd = `cat '${escapedLocal}' | ssh ${sshOptions} ${this.username}@${this.host} '${remoteCmd}'`;
 
     const args = ['-c', shellCmd];
-    return execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
+    await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
+
+    // Verify file transfer by comparing file sizes
+    const remoteSize = await this.exec(`wc -c < '${escapedRemote}' | tr -d ' '`);
+    const remoteSizeBytes = parseInt(remoteSize.trim(), 10);
+
+    if (remoteSizeBytes !== localFileSize) {
+      throw new Error(
+        `File transfer verification failed: local size ${localFileSize} bytes, remote size ${remoteSizeBytes} bytes. ` +
+        `File may be truncated on remote. Ensure full file transfer before proceeding.`
+      );
+    }
+
+    return `File transferred successfully: ${localFileName} (${localFileSize} bytes)`;
   }
 }
 
