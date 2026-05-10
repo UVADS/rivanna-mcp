@@ -307,13 +307,21 @@ Get job accounting and compute hour usage over a time period.
 ### `submit_job`
 Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
 
+**Default Values (presented for user confirmation):**
+- `jobName`: Generated from project folder name + 6 random alphanumeric chars (e.g., `"rivanna-work-1a2b3c"`)
+- `partition`: `"standard"`
+- `cpus`: `4`
+- `memory`: `"16GB"`
+- `time`: `"01:00:00"` (1 hour)
+- `submit`: `true` (submit immediately)
+
 **Parameters:**
-- `jobName` (string, required): Name for the job (alphanumeric, underscores/hyphens OK)
-- `allocation` (string, required): Account/allocation to charge compute hours to
-- `partition` (string, required): Partition to submit to (`gpu`, `parallel`, `standard`, `largemem`)
-- `cpus` (integer, required): Number of CPU cores to request
-- `memory` (string, required): Memory to request (e.g., `"16GB"`, `"32GB"`, `"64GB"`)
-- `time` (string, required): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
+- `jobName` (string, optional): Name for the job (alphanumeric, underscores/hyphens OK)
+- `allocation` (string, optional): Account/allocation to charge compute hours to (uses config default if not provided)
+- `partition` (string, optional): Partition to submit to (`gpu`, `parallel`, `standard`, `largemem`)
+- `cpus` (integer, optional): Number of CPU cores to request
+- `memory` (string, optional): Memory to request (e.g., `"16GB"`, `"32GB"`, `"64GB"`)
+- `time` (string, optional): Walltime limit in HH:MM:SS format (e.g., `"01:00:00"`)
 - `nodes` (integer, optional): Number of compute nodes (default: 1)
 - `gpus` (string, optional): Number of GPUs per node (only for gpu partition)
 - `outputPath` (string, optional): Path for stdout output file (default: job directory)
@@ -322,7 +330,7 @@ Create and optionally submit a SLURM job file to Rivanna with configurable resou
 - `language` (string, optional): Programming environment: `"python"` (miniforge), `"r"` (with goolf), or `"none"` (default: `"python"`)
 - `moduleVersion` (string, optional): Specific module version (e.g., `"py310"`, `"py311"` for Python)
 - `filesToTransfer` (array, optional): List of local file paths to copy to the job directory (e.g., `["./script.py", "./data.csv"]`)
-- `submit` (boolean, optional): Whether to submit immediately (default: false)
+- `submit` (boolean, optional): Whether to submit immediately (default: true)
 
 **Job Organization:**
 
