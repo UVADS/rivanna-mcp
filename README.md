@@ -21,23 +21,33 @@ Some things you can do with this MCP:
 
 ```mermaid
 graph LR
-    Claude["Claude Code"] -->|MCP Protocol| MCP["rivanna-mcp<br/>MCP Server"]
-    Cursor["Cursor"] -->|MCP Protocol| MCP
-    Codex["Codex"] -->|MCP Protocol| MCP
-    Kiro["Kiro"] -->|MCP Protocol| MCP
+    subgraph LOCAL["🖥️ LOCAL DEVELOPER ENVIRONMENT"]
+        Claude["🔧 Claude Code"] -->|MCP Protocol| MCP["⚙️ rivanna-mcp<br/>MCP Server"]
+        Cursor["📝 Cursor"] -->|MCP Protocol| MCP
+        Codex["📚 Codex"] -->|MCP Protocol| MCP
+        Kiro["🎯 Kiro"] -->|MCP Protocol| MCP
+    end
     
-    MCP -->|SSH| Rivanna["Rivanna<br/>Login Node"]
+    MCP -->|SSH Tunnel| Rivanna
     
-    Rivanna -->|squeue| SQueue["Job Status"]
-    Rivanna -->|sinfo| SInfo["Node Resources"]
-    Rivanna -->|sbatch| SBatch["Job Submission"]
-    Rivanna -->|sacct| SAckt["Job Accounting"]
+    subgraph REMOTE["🖲️ REMOTE HPC CLUSTER"]
+        Rivanna["Rivanna<br/>Login Node"]
+        
+        Rivanna -->|squeue| SQueue["📊 Job Status"]
+        Rivanna -->|sinfo| SInfo["📊 Node Resources"]
+        Rivanna -->|sbatch| SBatch["📊 Job Submission"]
+        Rivanna -->|sacct| SAckt["📊 Job Accounting"]
+    end
     
-    style Claude fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Cursor fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Codex fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style Kiro fill:#60a5fa,stroke:#1e3a5f,color:#fff
-    style MCP fill:#3b82f6,stroke:#1e3a5f,color:#fff
+    style LOCAL fill:#fef3c7,stroke:#b45309,color:#1e1e1e
+    style REMOTE fill:#dbeafe,stroke:#1e40af,color:#1e1e1e
+    
+    style Claude fill:#fed7aa,stroke:#c2410c,color:#1e1e1e
+    style Cursor fill:#fed7aa,stroke:#c2410c,color:#1e1e1e
+    style Codex fill:#fed7aa,stroke:#c2410c,color:#1e1e1e
+    style Kiro fill:#fed7aa,stroke:#c2410c,color:#1e1e1e
+    style MCP fill:#f59e0b,stroke:#92400e,color:#fff
+    
     style Rivanna fill:#3b82f6,stroke:#1e3a5f,color:#fff
     style SQueue fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
     style SInfo fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
