@@ -147,10 +147,13 @@ rivanna-mcp setup
 ```
 
 You'll be prompted for:
-- **Computing ID**: Your Rivanna username (e.g., `nem2p`)
-- **SSH Key Path**: Path to your SSH private key (e.g., `~/.ssh/nem2p_rivanna`)
+- **Environment**: Are you working remotely or on a Rivanan compute node?
+- **Computing ID**: Your Rivanna username (e.g., `mst3k`).
+- **SSH Key Path**: Path to your SSH private key (e.g., `~/.ssh/my_key_rivanna`)
+- **Logging**: Would you like your MCP history saved to `~/.rivanna-mcp/history.log`.
+- **Default Allocation**: Select your default allocation for SLURM submissions.
 
-The wizard will test the SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
+The wizard will test your SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
 
 ### 2. Configure in your IDE
 
@@ -362,12 +365,12 @@ None
 Execute arbitrary shell commands directly on Rivanna and get the output back to your IDE.
 
 **Parameters:**
-- `command` (string, required): The shell command to execute (e.g., `"ls -al /home/nem2p/projects/"`)
+- `command` (string, required): The shell command to execute (e.g., `"ls -al /home/mst3k/projects/"`)
 
 **Example Prompts:**
 - "Run this command on the cluster: `ls -al $HOME/projects`"
 - "Show me the 5 largest files in my home directory"
-- "Execute: `du -sh /scratch/nem2p/* | sort -h`"
+- "Execute: `du -sh /scratch/mst3k/* | sort -h`"
 
 ## Troubleshooting
 
