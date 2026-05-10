@@ -22,13 +22,17 @@ class SSHClient {
   }
 
   async transferFile(localPath, remotePath, timeout = 60000) {
-    const remoteCmd = `cat > '${remotePath.replace(/'/g, "'\"'\"'")}'`;
+    // Use rsync for robust file transfer instead of cat/pipe
+    // rsync handles proper shell escaping, directories, and binary files safely
+    const sshOptions = this.getSSHOptions().join(' ');
     const args = [
-      '-c',
-      `cat '${localPath.replace(/'/g, "'\"'\"'")}' | ssh ${this.getSSHOptions().join(' ')} '${this.username}@${this.host}' '${remoteCmd}'`
+      '-av',
+      `--rsh=ssh ${sshOptions}`,
+      localPath,
+      `${this.username}@${this.host}:${remotePath}`
     ];
 
-    return execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
+    return execCommand('rsync', args, { timeout, errorPrefix: 'File transfer failed' });
   }
 }
 
