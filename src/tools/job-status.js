@@ -1,6 +1,6 @@
 import { parseLineDelimited, shellQuote } from '../utils.js';
 
-export async function getJobStatus(sshClient, options = {}) {
+export async function listJobs(sshClient, options = {}) {
   const { state = 'all', user, limit = 100 } = options;
 
   // Use simple pipe-delimited format for reliable parsing
@@ -44,8 +44,8 @@ export async function getJobStatus(sshClient, options = {}) {
   };
 }
 
-export const jobStatusTool = {
-  name: 'get_job_status',
+export const listJobsTool = {
+  name: 'list_jobs',
   description:
     'Query the SLURM job queue to monitor and track all jobs on Rivanna HPC cluster. Returns detailed information for each job: job_id (SLURM identifier), partition (which queue it\'s in: standard/parallel/gpu/largemem), job name, user/owner, current status, time elapsed, time remaining until limit, node count allocated, and specific node list. Use this tool to: (1) monitor long-running computations and check progress, (2) verify jobs submitted via submit_job actually started, (3) check queue backlog and estimate when your pending job will run, (4) identify stuck or failed jobs that need investigation with get_allocation_info, (5) understand cluster utilization patterns, (6) find job_id values needed to cancel jobs with cancel_job. Supports efficient filtering by job state, user, and result limits for large clusters.',
   inputSchema: {
@@ -59,7 +59,7 @@ export const jobStatusTool = {
       },
       user: {
         type: 'string',
-        description: 'Filter to show only jobs belonging to a specific username (e.g., "nmagee" or "nem2p"). Useful for monitoring your own jobs or troubleshooting a specific user\'s activity. Omit to see all jobs across the entire cluster.',
+        description: 'Filter to show only jobs belonging to a specific username (e.g., "mst3k"). Useful for monitoring your own jobs or troubleshooting a specific user\'s activity. Omit to see all jobs across the entire cluster.',
       },
       limit: {
         type: 'number',

@@ -292,8 +292,8 @@ View resource allocation limits for users and accounts.
 - "Tell me about my compute hour budget"
 - "Show allocation info for user mst3k"
 
-### `get_job_accounting`
-Get job accounting and compute hour usage over a time period.
+### `get_job_history`
+Get historical job accounting and compute hour usage over a time period.
 
 **Parameters:**
 - `user` (string, optional): Filter by username
@@ -301,8 +301,8 @@ Get job accounting and compute hour usage over a time period.
 
 **Example Prompts:**
 - "How many compute hours have I used this month?"
-- "Show me my job accounting for the last 60 days"
-- "What's my job history?"
+- "Show me my job history for the last 60 days"
+- "What's my historical job accounting?"
 
 ### `submit_job`
 Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
@@ -397,8 +397,8 @@ Claude will interview you for the required parameters, recommend appropriate mod
 4. You can review it or let Claude submit it
 5. Your job files are organized in a dedicated directory
 
-### `get_job_status`
-Query the SLURM job queue with flexible filtering.
+### `list_jobs`
+Query the SLURM job queue and list all jobs with flexible filtering.
 
 **Parameters:**
 - `state` (string, optional): Filter by job state: `all`, `RUNNING`, `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED` (default: `all`)
@@ -414,7 +414,7 @@ Query the SLURM job queue with flexible filtering.
 Cancel a running or pending SLURM job by ID.
 
 **Parameters:**
-- `jobId` (string, required): The SLURM job ID to cancel (get from `get_job_status` tool)
+- `jobId` (string, required): The SLURM job ID to cancel (get from `list_jobs` tool)
 - `signal` (string, optional): Signal to send: `SIGTERM` (graceful, default), `SIGKILL` (force), or other UNIX signal
 
 **Example Prompts:**

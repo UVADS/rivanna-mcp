@@ -96,7 +96,7 @@ function parseMamBalanceOutput(output) {
   return accounts;
 }
 
-export async function getJobAccounting(sshClient, options = {}) {
+export async function getJobHistory(sshClient, options = {}) {
   const { user, days = 30 } = options;
 
   const startDate = new Date();
@@ -158,16 +158,16 @@ export const allocationInfoTool = {
   },
 };
 
-export const jobAccountingTool = {
-  name: 'get_job_accounting',
+export const jobHistoryTool = {
+  name: 'get_job_history',
   description:
-    'Get historical job accounting and compute hour usage for auditing resource consumption and budgeting. Returns per-job details: job ID, name, user, account, final status (COMPLETED/FAILED/TIMEOUT), time elapsed, CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs in the time window for budget tracking. Use this to: (1) understand how many compute hours jobs consumed historically, (2) estimate resource needs for similar future jobs, (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify inefficient jobs (short time but high CPU/memory usage indicates poor parallelization), (5) prepare reports on resource usage. Supports lookback from 1-365+ days; default is 30 days of recent history. Combine with get_allocation_info to understand budget remaining.',
+    'Get historical job accounting and compute hour usage for auditing resource consumption and budgeting. Works for any user on the system—filter by username to examine any user\'s job history. Returns per-job details: job ID, name, user, account, final status (COMPLETED/FAILED/TIMEOUT), time elapsed, CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs in the time window for budget tracking. Use this to: (1) understand how many compute hours jobs consumed historically, (2) estimate resource needs for similar future jobs, (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify inefficient jobs (short time but high CPU/memory usage indicates poor parallelization), (5) prepare reports on resource usage, (6) audit another user\'s cluster activity. Supports lookback from 1-365+ days; default is 30 days of recent history. Combine with get_allocation_info to understand budget remaining.',
   inputSchema: {
     type: 'object',
     properties: {
       user: {
         type: 'string',
-        description: 'Filter to show job accounting for a specific username. Omit to show your own job history.',
+        description: 'Show job history for a specific username (e.g., "mst3k"). Use this to audit any user\'s cluster activity. Omit to show your own job history.',
       },
       days: {
         type: 'number',

@@ -1,4 +1,4 @@
-import { getJobStatus, jobStatusTool } from './job-status.js';
+import { listJobs, listJobsTool } from './job-status.js';
 import {
   getNodeResources,
   nodeResourcesTool,
@@ -11,9 +11,9 @@ import {
 } from './storage-quota.js';
 import {
   getAllocationInfo,
-  getJobAccounting,
+  getJobHistory,
   allocationInfoTool,
-  jobAccountingTool,
+  jobHistoryTool,
 } from './allocation-billing.js';
 import {
   getClusterUsage24h,
@@ -29,12 +29,12 @@ import { execCommand, execCommandTool } from './exec-command.js';
 import { sshLogin, sshLoginTool } from './ssh-login.js';
 
 const toolDefinitions = [
-  [jobStatusTool, (client, args) => getJobStatus(client, args)],
+  [listJobsTool, (client, args) => listJobs(client, args)],
   [nodeResourcesTool, (client, args) => getNodeResources(client, args)],
   [storageQuotaTool, (client, args) => getStorageQuota(client, args)],
   [directoryUsageTool, (client, args = {}) => getDirectoryUsage(client, args.path)],
   [allocationInfoTool, (client, args) => getAllocationInfo(client, args)],
-  [jobAccountingTool, (client, args) => getJobAccounting(client, args)],
+  [jobHistoryTool, (client, args) => getJobHistory(client, args)],
   [clusterUsage24hTool, (client, args) => getClusterUsage24h(client, args)],
   [clusterOverviewTool, (client, args) => getClusterOverview(client, args)],
   [submitJobTool, (client, args, config) => submitJob(client, args, config)],
