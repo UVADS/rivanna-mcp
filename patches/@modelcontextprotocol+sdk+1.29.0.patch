@@ -1,0 +1,76 @@
+diff --git a/node_modules/@modelcontextprotocol/sdk/dist/cjs/shared/stdio.js b/node_modules/@modelcontextprotocol/sdk/dist/cjs/shared/stdio.js
+index 540ee56..15b0745 100644
+--- a/node_modules/@modelcontextprotocol/sdk/dist/cjs/shared/stdio.js
++++ b/node_modules/@modelcontextprotocol/sdk/dist/cjs/shared/stdio.js
+@@ -12,16 +12,24 @@ class ReadBuffer {
+         this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
+     }
+     readMessage() {
+-        if (!this._buffer) {
+-            return null;
++        while (this._buffer) {
++            const index = this._buffer.indexOf('\n');
++            if (index === -1) {
++                return null;
++            }
++            const line = this._buffer.toString('utf8', 0, index).replace(/\r$/, '');
++            this._buffer = this._buffer.subarray(index + 1);
++            try {
++                return deserializeMessage(line);
++            }
++            catch (error) {
++                if (error instanceof SyntaxError) {
++                    continue;
++                }
++                throw error;
++            }
+         }
+-        const index = this._buffer.indexOf('\n');
+-        if (index === -1) {
+-            return null;
+-        }
+-        const line = this._buffer.toString('utf8', 0, index).replace(/\r$/, '');
+-        this._buffer = this._buffer.subarray(index + 1);
+-        return deserializeMessage(line);
++        return null;
+     }
+     clear() {
+         this._buffer = undefined;
+diff --git a/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js b/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+index 30f299f..f0f045b 100644
+--- a/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
++++ b/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+@@ -7,16 +7,24 @@ export class ReadBuffer {
+         this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
+     }
+     readMessage() {
+-        if (!this._buffer) {
+-            return null;
++        while (this._buffer) {
++            const index = this._buffer.indexOf('\n');
++            if (index === -1) {
++                return null;
++            }
++            const line = this._buffer.toString('utf8', 0, index).replace(/\r$/, '');
++            this._buffer = this._buffer.subarray(index + 1);
++            try {
++                return deserializeMessage(line);
++            }
++            catch (error) {
++                if (error instanceof SyntaxError) {
++                    continue;
++                }
++                throw error;
++            }
+         }
+-        const index = this._buffer.indexOf('\n');
+-        if (index === -1) {
+-            return null;
+-        }
+-        const line = this._buffer.toString('utf8', 0, index).replace(/\r$/, '');
+-        this._buffer = this._buffer.subarray(index + 1);
+-        return deserializeMessage(line);
++        return null;
+     }
+     clear() {
+         this._buffer = undefined;
