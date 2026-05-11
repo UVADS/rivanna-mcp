@@ -155,7 +155,30 @@ You'll be prompted for:
 
 The wizard will test your SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
 
-### 2. Configure in your IDE
+### 2. Set Your SLURM Defaults (Optional but Recommended)
+
+To streamline job submissions, configure your preferred SLURM parameters (allocation, partition, CPU count, memory, etc.):
+
+```bash
+rivanna-mcp slurm-defaults
+```
+
+This interactive setup will guide you through:
+- **Allocation Account**: Which account to charge compute hours to
+- **Partition**: Your preferred queue (standard, gpu, parallel, largemem)
+- **CPUs**: Default number of CPU cores
+- **Memory**: Default memory allocation
+- **Wall-Clock Time**: Default job timeout
+- **Nodes/GPUs**: Defaults for parallel or GPU jobs (if applicable)
+
+Your preferences are saved to `~/.rivanna-mcp/slurm-defaults.json` and will be used by:
+- **Claude Code**: When using the `submit_job` tool
+- **Any other tools**: That reference your SLURM preferences
+- **Future CLI commands**: Any other tools you build on top of rivanna-mcp
+
+You can always update your preferences by running the command again.
+
+### 3. Configure in your IDE
 
 You have two options for integrating `rivanna-mcp` with a tool like Claude Code:
 
@@ -212,16 +235,16 @@ With this configuration, Claude Code will automatically start the MCP server whe
 Claude Code will now:
 - Automatically start the `rivanna-mcp` server when you begin a session
 - Manage the server lifecycle (no manual terminal needed)
-- Provide access to all 12 HPC tools in your prompts
+- Provide access to all HPC tools in your prompts
 
 **Benefits:**
 - One less terminal to manage
 - Server starts automatically with your project
 - Cleaner workflow within Claude Code
 
-### 3. Use in your Development Environment
+### 4. Use in your Development Environment
 
-Once configured (either running manually or via settings.json), you'll have access to 12 tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
+Once configured (either running manually or via settings.json), you'll have access to HPC tools for monitoring, submitting, and managing jobs on your Rivanna cluster directly from your IDE queries and prompts.
 
 ## Available Tools
 
@@ -309,11 +332,14 @@ Create and optionally submit a SLURM job file to Rivanna with configurable resou
 
 **Default Values (presented for user confirmation):**
 - `jobName`: Generated from project folder name + 6 random alphanumeric chars (e.g., `"rivanna-work-1a2b3c"`)
-- `partition`: `"standard"`
-- `cpus`: `4`
-- `memory`: `"16GB"`
-- `time`: `"01:00:00"` (1 hour)
+- `partition`: From your saved preferences (set via `rivanna-mcp slurm-defaults`), or `"standard"` if not configured
+- `cpus`: From your saved preferences, or `4` if not configured
+- `memory`: From your saved preferences, or `"16GB"` if not configured
+- `time`: From your saved preferences, or `"01:00:00"` (1 hour) if not configured
+- `allocation`: From your saved preferences (required)
 - `submit`: `true` (submit immediately)
+
+**Note:** If you haven't configured your SLURM defaults yet, the tool will warn you and suggest running `rivanna-mcp slurm-defaults` to set them up.
 
 **Parameters:**
 - `jobName` (string, optional): Name for the job (alphanumeric, underscores/hyphens OK)

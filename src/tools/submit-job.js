@@ -1,6 +1,7 @@
 import { shellQuote } from '../utils.js';
 import { basename, resolve } from 'path';
 import { promises as fs } from 'fs';
+import { loadSlurmDefaults } from '../commands/slurm-defaults.js';
 
 // Module system configuration for Rivanna
 // Defines default module loading commands for common languages/environments
@@ -102,6 +103,9 @@ async function handleDependencies(cwd, language) {
 }
 
 export async function submitJob(sshClient, options = {}, config = {}) {
+  // Load user's saved SLURM defaults if they exist
+  const slurmDefaults = await loadSlurmDefaults();
+
   const {
     jobName,
     allocation,
@@ -120,13 +124,23 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     submit,
   } = options;
 
-  // Apply sensible defaults
+  // Apply defaults: user prefs > saved defaults > built-in defaults
   const defaultJobName = generateDefaultJobName();
-  const defaultTime = '01:00:00';
+  const defaultTime = slurmDefaults?.time || '01:00:00';
   const defaultSubmit = true;
-  const defaultPartition = 'standard';
-  const defaultCpus = 4;
-  const defaultMemory = '16GB';
+  const defaultPartition = slurmDefaults?.partition || 'standard';
+  const defaultCpus = slurmDefaults?.cpus || 4;
+  const defaultMemory = slurmDefaults?.memory || '16GB';
+  const defaultNodes = slurmDefaults?.nodes || 1;
+
+  // Warn if user hasn't set up preferences yet (but allow job to proceed with built-in defaults)
+  if (!slurmDefaults && !allocation) {
+    console.warn(
+      '\n⚠️  SLURM preferences not configured. Using built-in defaults.\n' +
+      '    To set your preferred allocation, partition, and resource limits, run:\n' +
+      '    → rivanna-mcp slurm-defaults\n'
+    );
+  }
 
   const finalJobName = jobName || defaultJobName;
   const finalTime = time || defaultTime;
@@ -134,9 +148,10 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const finalPartition = partition || defaultPartition;
   const finalCpus = cpus || defaultCpus;
   const finalMemory = memory || defaultMemory;
+  const finalNodes = nodes !== 1 ? nodes : defaultNodes;
 
-  // Use default allocation if not provided
-  const resolvedAllocation = allocation || config.defaultAllocation;
+  // Use default allocation: explicit > saved prefs > config > none
+  const resolvedAllocation = allocation || slurmDefaults?.allocation || config.defaultAllocation;
 
   // Validate required parameters
   const required = { allocation: resolvedAllocation };
@@ -220,7 +235,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const finalOutputPath = outputPath || `${jobDir}/%j.out`; // Use %j for job ID
   const finalErrorPath = errorPath || `${jobDir}/%j.err`;
 
-  let slurmScript = `#!/bin/bash\n#SBATCH --job-name=${finalJobName}\n#SBATCH --account=${resolvedAllocation}\n#SBATCH --partition=${finalPartition}\n#SBATCH --nodes=${nodes}\n#SBATCH --cpus-per-task=${finalCpus}\n#SBATCH --mem=${finalMemory}\n#SBATCH --time=${finalTime}\n#SBATCH --output=${finalOutputPath}\n#SBATCH --error=${finalErrorPath}`;
+  let slurmScript = `#!/bin/bash\n#SBATCH --job-name=${finalJobName}\n#SBATCH --account=${resolvedAllocation}\n#SBATCH --partition=${finalPartition}\n#SBATCH --nodes=${finalNodes}\n#SBATCH --cpus-per-task=${finalCpus}\n#SBATCH --mem=${finalMemory}\n#SBATCH --time=${finalTime}\n#SBATCH --output=${finalOutputPath}\n#SBATCH --error=${finalErrorPath}`;
 
   if (gpus) {
     slurmScript += `\n#SBATCH --gpus-per-node=${gpus}`;
@@ -298,10 +313,10 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     submitted: false,
     suggestedDefaults: {
       jobName: { suggested: defaultJobName, used: finalJobName, wasDefault: !jobName },
-      partition: { suggested: defaultPartition, used: finalPartition, wasDefault: !partition },
-      cpus: { suggested: defaultCpus, used: finalCpus, wasDefault: !cpus },
-      memory: { suggested: defaultMemory, used: finalMemory, wasDefault: !memory },
-      time: { suggested: defaultTime, used: finalTime, wasDefault: !time },
+      partition: { suggested: defaultPartition, used: finalPartition, wasDefault: !partition, fromUserPrefs: !!slurmDefaults?.partition },
+      cpus: { suggested: defaultCpus, used: finalCpus, wasDefault: !cpus, fromUserPrefs: !!slurmDefaults?.cpus },
+      memory: { suggested: defaultMemory, used: finalMemory, wasDefault: !memory, fromUserPrefs: !!slurmDefaults?.memory },
+      time: { suggested: defaultTime, used: finalTime, wasDefault: !time, fromUserPrefs: !!slurmDefaults?.time },
       submit: { suggested: defaultSubmit, used: finalSubmit, wasDefault: submit === undefined },
     },
   };
