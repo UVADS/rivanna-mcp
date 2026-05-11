@@ -133,14 +133,14 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const defaultMemory = slurmDefaults?.memory || '16GB';
   const defaultNodes = slurmDefaults?.nodes || 1;
 
-  // Warn if user hasn't set up preferences yet (but allow job to proceed with built-in defaults)
-  if (!slurmDefaults && !allocation) {
-    console.warn(
-      '\n⚠️  SLURM preferences not configured. Using built-in defaults.\n' +
-      '    To set your preferred allocation, partition, and resource limits, run:\n' +
-      '    → rivanna-mcp slurm-defaults\n'
-    );
-  }
+  // Build a setup hint that gets surfaced in the tool result so the user
+  // (via the MCP client) can see it — stderr warnings don't reach the LLM.
+  const setupHint = !slurmDefaults
+    ? 'SLURM preferences are not configured. The job will use built-in defaults ' +
+      '(partition=standard, cpus=4, memory=16GB, time=01:00:00). ' +
+      'To set your preferred allocation, partition, and resource limits, run:\n' +
+      '    rivanna-mcp slurm-defaults'
+    : null;
 
   const finalJobName = jobName || defaultJobName;
   const finalTime = time || defaultTime;
@@ -160,8 +160,15 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     .map(([k]) => k);
 
   if (missing.length > 0) {
+    const hint = missing.includes('allocation') && !slurmDefaults
+      ? '\n\nNo allocation was provided and no SLURM preferences file was found. ' +
+        'Set up your defaults (allocation, partition, resources) by running:\n' +
+        '    rivanna-mcp slurm-defaults\n' +
+        'Or pass `allocation` explicitly to this tool. ' +
+        'Use the get_allocation_info tool to discover your available allocations.'
+      : '';
     throw new Error(
-      `Missing required parameters: ${missing.join(', ')}`
+      `Missing required parameters: ${missing.join(', ')}${hint}`
     );
   }
 
@@ -288,6 +295,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 
   const result = {
     success: true,
+    ...(setupHint && { setupHint }),
     jobDir,
     jobDirName,
     jobFilePath,
