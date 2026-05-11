@@ -20,9 +20,8 @@ export function logStartup(message) {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${message}`;
     appendFileSync(STARTUP_LOG_FILE, logEntry + '\n');
-    console.error(logEntry);
   } catch (error) {
-    console.error('Failed to write startup log:', error.message);
+    // Silently fail - don't write to stderr as it corrupts MCP protocol
   }
 }
 
@@ -106,8 +105,7 @@ export function logStartupError(message, error = null) {
       }
     }
     appendFileSync(STARTUP_LOG_FILE, logEntry + '\n');
-    console.error(`ERROR: ${message}`, error);
   } catch (err) {
-    console.error('Failed to write startup error log:', err.message);
+    // Silently fail - don't write to stderr as it corrupts MCP protocol
   }
 }

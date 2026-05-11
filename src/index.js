@@ -17,8 +17,6 @@ let client;
 let loggingEnabled;
 
 async function main() {
-  console.error('Rivanna MCP server starting...');
-
   try {
     logStartup('Step 1: Loading configuration...');
     config = loadConfig();
