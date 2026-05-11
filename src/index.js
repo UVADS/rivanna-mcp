@@ -285,3 +285,4 @@ process.on('uncaughtException', (error) => {
 
 process.on('exit', (code) => {
   logStartup(`[PROCESS EXIT at ${new Date().toISOString()}] Exit code: ${code}`);
+});
