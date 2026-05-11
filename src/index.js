@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { loadConfig } from './config.js';
 import { createClient } from './client-factory.js';
-import { initializeLogger, logRequest, logError, logSuccess, logStartup, logStartupError, getStartupLogFilePath, setLoggingEnabled } from './logger.js';
+import { initializeLogger, logRequest, logError, logSuccess, logStartup, logStartupError, getStartupLogFilePath, setLoggingEnabled, setVerboseMode, logVerbose } from './logger.js';
 import { tools, toolHandlers } from './tools/index.js';
 
 let server;
@@ -62,8 +62,12 @@ async function main() {
     try {
       initializeLogger();
       setLoggingEnabled(config.logging !== false);
+      setVerboseMode(config.verbose === true);
       logStartup('✓ Logger initialized');
       logStartup(`  Startup log file: ${getStartupLogFilePath()}`);
+      if (config.verbose) {
+        logStartup('  Verbose mode: ENABLED');
+      }
     } catch (loggerError) {
       logStartupError('Failed to initialize logger', loggerError);
       process.exit(EXIT_CODES.LOGGER_ERROR);
@@ -102,6 +106,8 @@ async function main() {
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       let toolName = 'unknown';
       try {
+        logVerbose('Received tool request', { timestamp: new Date().toISOString() });
+
         if (!request.params || typeof request.params !== 'object') {
           throw new McpError(ErrorCode.InvalidRequest, 'Request must have params object');
         }
@@ -114,15 +120,18 @@ async function main() {
 
         toolName = name;
         logRequest(name, args);
+        logVerbose(`Tool handler lookup: ${name}`, { hasClient: !!client, configLoaded: !!config });
 
         const handler = toolHandlers.get(name);
         if (!handler) {
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
 
+        logVerbose(`Executing tool handler: ${name}`);
         const result = await handler(client, args || {}, config);
 
         logSuccess(name);
+        logVerbose(`Tool completed successfully: ${name}`, { resultSize: JSON.stringify(result).length });
         return {
           content: [
             {
@@ -133,6 +142,7 @@ async function main() {
         };
       } catch (error) {
         logError(toolName, error);
+        logStartupError(`Tool error during execution: ${toolName}`, error);
 
         return {
           content: [
@@ -152,12 +162,21 @@ async function main() {
     logStartup('  Transport created, attempting connection...');
 
     transport.onclose = () => {
-      logStartup('WARNING: Transport closed unexpectedly!');
+      logStartup('[TRANSPORT HANDLER] onclose triggered!');
+      logStartupError('Transport closed unexpectedly! This is a critical failure.');
+      logVerbose('Transport state dump', { isShuttingDown, hasClient: !!client });
+      logStartup(`  Exiting with code ${EXIT_CODES.TRANSPORT_ERROR}`);
       process.exit(EXIT_CODES.TRANSPORT_ERROR);
     };
 
     transport.onerror = (error) => {
-      logStartupError('Transport error', error);
+      logStartup('[TRANSPORT HANDLER] onerror triggered!');
+      logStartupError('Transport error - this will cause server failure', error);
+      logVerbose('Transport error details', {
+        eventType: 'transport_error',
+        timestamp: new Date().toISOString(),
+      });
+      logStartup(`  Exiting with code ${EXIT_CODES.TRANSPORT_ERROR}`);
       process.exit(EXIT_CODES.TRANSPORT_ERROR);
     };
 
@@ -168,13 +187,43 @@ async function main() {
     await Promise.race([server.connect(transport), connectTimeout]);
     logStartup('✓ Connected to stdio transport');
     logStartup('✓ Rivanna MCP server started successfully');
-    logStartup('Server is ready and waiting for requests...');
+    logStartup(`Server is ready and waiting for requests at ${new Date().toISOString()}`);
+
+    // Set up periodic heartbeat if verbose mode is enabled
+    logStartup('Step 7: Setting up heartbeat...');
+    if (config.verbose) {
+      logStartup('  Verbose mode detected, creating 30s heartbeat interval');
+      const heartbeatInterval = setInterval(() => {
+        logVerbose('Heartbeat - server is alive', {
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          timestamp: new Date().toISOString(),
+        });
+      }, 30000); // Log heartbeat every 30 seconds
+
+      // Ensure heartbeat doesn't prevent graceful shutdown
+      heartbeatInterval.unref();
+      logStartup('  ✓ Heartbeat interval created and unref()d');
+    } else {
+      logStartup('  Verbose mode disabled, skipping heartbeat');
+    }
 
     // Keep process alive indefinitely by creating a never-resolving promise
     // The transport maintains active stdio listeners, keeping stdin/stdout alive
-    await new Promise(() => {
+    logStartup('Step 8: Creating never-resolving promise to keep process alive...');
+    logStartup(`  Active handles before promise: ${process._getActiveHandles?.().length ?? 'unknown'}`);
+
+    let promiseCreated = false;
+    await new Promise((resolve, reject) => {
+      promiseCreated = true;
+      logStartup('Step 8b: Promise callback executing, logging wait state');
+      logVerbose('Process entering wait state', { timestamp: new Date().toISOString() });
+      logStartup('Step 8c: Logged wait state, promise callback complete (will wait indefinitely)');
       // This promise never resolves; process exits only via signals or transport close
     });
+
+    // This line should never execute
+    logStartupError('FATAL: Promise resolved unexpectedly! This should never happen.');
   } catch (error) {
     const exitCode = error.message?.includes('Invalid tool') ? EXIT_CODES.TOOL_ERROR :
                      error.message?.includes('configuration') ? EXIT_CODES.CONFIG_ERROR :
@@ -197,12 +246,21 @@ main().catch((error) => {
 process.on('unhandledRejection', (reason, promise) => {
   if (isShuttingDown) return;
   const error = reason instanceof Error ? reason : new Error(String(reason));
-  logStartupError('Unhandled Promise Rejection', error);
+  logStartupError('CRITICAL: Unhandled Promise Rejection', error);
+  logVerbose('Unhandled rejection details', {
+    promise: String(promise),
+    errorType: error.constructor.name,
+    timestamp: new Date().toISOString(),
+  });
   handleShutdown('unhandledRejection');
 });
 
 process.on('uncaughtException', (error) => {
   if (isShuttingDown) return;
-  logStartupError('Uncaught Exception', error);
+  logStartupError('CRITICAL: Uncaught Exception', error);
+  logVerbose('Uncaught exception details', {
+    errorType: error.constructor.name,
+    timestamp: new Date().toISOString(),
+  });
   handleShutdown('uncaughtException');
 });
