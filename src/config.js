@@ -6,16 +6,10 @@ const CONFIG_FILE = join(homedir(), '.rivanna-mcp', 'config.json');
 
 export function loadConfig() {
   if (!existsSync(CONFIG_FILE)) {
-    console.error(
-      `\n❌ Configuration not found at: ${CONFIG_FILE}`
-    );
-    console.error(
-      '\n📝 Please run: rivanna-mcp setup'
-    );
-    console.error(
-      '\nThis will guide you through configuring your Rivanna connection.\n'
-    );
-    process.exit(1);
+    console.error(`\nConfiguration not found: ${CONFIG_FILE}`);
+    console.error(`\nSetup required. Run:`);
+    console.error(`  rivanna-mcp setup\n`);
+    process.exit(2);
   }
 
   try {
@@ -23,8 +17,10 @@ export function loadConfig() {
     validateConfig(config);
     return config;
   } catch (error) {
-    console.error(`\n❌ Error reading configuration: ${error.message}`);
-    process.exit(1);
+    console.error(`\nConfiguration error: ${error.message}`);
+    console.error(`\nTo fix, run:`);
+    console.error(`  rivanna-mcp setup\n`);
+    process.exit(2);
   }
 }
 
@@ -53,7 +49,11 @@ function validateConfig(config) {
     }
 
     if (!existsSync(config.sshKeyPath)) {
-      throw new Error(`SSH key not found at: ${config.sshKeyPath}`);
+      throw new Error(
+        `SSH key not found: ${config.sshKeyPath}\n` +
+        `Generate with: ssh-keygen -t ed25519 -f ${config.sshKeyPath}\n` +
+        `Then update config at: ${CONFIG_FILE}`
+      );
     }
   }
 }

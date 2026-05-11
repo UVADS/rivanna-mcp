@@ -43,6 +43,26 @@ const toolDefinitions = [
   [sshLoginTool, () => sshLogin()],
 ];
 
+// Validate tool definitions at import time
+const toolNames = new Set();
+toolDefinitions.forEach((pair, index) => {
+  const [tool, handler] = pair;
+
+  if (!tool || typeof tool !== 'object' || !tool.name || typeof tool.name !== 'string') {
+    throw new Error(`Invalid tool definition at index ${index}: missing or invalid tool name`);
+  }
+
+  if (typeof handler !== 'function') {
+    throw new Error(`Invalid tool handler at index ${index} (${tool.name}): must be a function`);
+  }
+
+  if (toolNames.has(tool.name)) {
+    throw new Error(`Duplicate tool name detected: ${tool.name}`);
+  }
+
+  toolNames.add(tool.name);
+});
+
 export const tools = toolDefinitions.map(([tool]) => tool);
 export const toolHandlers = new Map(
   toolDefinitions.map(([tool, handler]) => [tool.name, handler])

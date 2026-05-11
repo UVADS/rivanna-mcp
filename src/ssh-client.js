@@ -56,6 +56,11 @@ class SSHClient {
 
     return `File transferred: ${localFileName}`;
   }
+
+  close() {
+    // SSH client spawns commands per-invocation with no persistent connection
+    // so there's nothing to close. This is a no-op to satisfy the client interface.
+  }
 }
 
 export default SSHClient;
