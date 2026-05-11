@@ -115,11 +115,6 @@ async function main() {
     logStartup('Server is ready and waiting for requests...');
     logStartup('Entering idle loop (waiting for requests)...');
 
-    // Prevent Node.js from exiting by keeping stdin/stdout active
-    process.stdin.setEncoding('utf8');
-    process.stdin.resume();
-    logStartup('✓ Stdin resumed to keep process alive');
-
     // Keep the process alive indefinitely with a heartbeat
     const heartbeatInterval = setInterval(() => {
       // Silent heartbeat - just keeps process alive
