@@ -215,15 +215,28 @@ async function main() {
     // The transport maintains active stdio listeners, keeping stdin/stdout alive
     logStartup('Step 8: Creating never-resolving promise to keep process alive...');
     logStartup(`  Active handles before promise: ${process._getActiveHandles?.().length ?? 'unknown'}`);
+    logStartup(`  Active requests before promise: ${process._getActiveRequests?.().length ?? 'unknown'}`);
 
     let promiseCreated = false;
-    await new Promise((resolve, reject) => {
+    const keepAlivePromise = new Promise((resolve, reject) => {
       promiseCreated = true;
       logStartup('Step 8b: Promise callback executing, logging wait state');
       logVerbose('Process entering wait state', { timestamp: new Date().toISOString() });
       logStartup('Step 8c: Logged wait state, promise callback complete (will wait indefinitely)');
+
+      // Periodically log that we're still alive and have listeners
+      const aliveCheckInterval = setInterval(() => {
+        const handles = process._getActiveHandles?.().length ?? 0;
+        const reqs = process._getActiveRequests?.().length ?? 0;
+        logStartup(`  [Keep-alive check] Handles: ${handles}, Requests: ${reqs}, Time: ${new Date().toISOString()}`);
+      }, 5000);
+      aliveCheckInterval.unref();
+
       // This promise never resolves; process exits only via signals or transport close
     });
+
+    logStartup('Step 8d: Waiting on promise...');
+    await keepAlivePromise;
 
     // This line should never execute
     logStartupError('FATAL: Promise resolved unexpectedly! This should never happen.');
