@@ -101,9 +101,22 @@ async function main() {
 
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       try {
-        logStartup('LIST TOOLS REQUEST');
+        logStartup('LIST TOOLS REQUEST - Handler called');
         logVerbose('Returning tools array', { toolCount: tools.length });
-        return { tools };
+
+        // Test serialization before returning
+        try {
+          const testJson = JSON.stringify({ tools });
+          logVerbose('Serialization test passed', { jsonSize: testJson.length });
+        } catch (serErr) {
+          logStartupError('CRITICAL: Tools array is not JSON serializable', serErr);
+          throw serErr;
+        }
+
+        logStartup('LIST TOOLS REQUEST - About to return response');
+        const response = { tools };
+        logStartup('LIST TOOLS REQUEST - Response object created, about to return');
+        return response;
       } catch (error) {
         logStartupError('ERROR in ListToolsRequestSchema handler', error);
         throw error;
