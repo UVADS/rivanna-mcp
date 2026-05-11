@@ -9,6 +9,10 @@ const STARTUP_LOG_FILE = join(CONFIG_DIR, 'startup.log');
 let loggerInitialized = false;
 let loggingEnabled = true;
 let verboseMode = false;
+let transportConnected = false;
+
+// Emergency buffer for errors that occur before logging is ready
+let errorBuffer = [];
 
 export function initializeLogger() {
   try {
@@ -81,7 +85,13 @@ function writeLine(file, level, message, data = null) {
     const logEntry = level ? formatLog(level, message, data) : `[${new Date().toISOString()}] ${message}`;
     appendFileSync(file, logEntry + '\n');
   } catch (error) {
-    // Silently fail - don't corrupt MCP protocol
+    // Before transport connects, we can write to stderr for critical issues
+    if (!transportConnected) {
+      const msg = `LOGGER ERROR: Failed to write to ${file}: ${error.message}`;
+      console.error(msg);
+      errorBuffer.push({ timestamp: new Date().toISOString(), error: msg });
+    }
+    // After transport connects, we can't write to stderr, but we tried to log it
   }
 }
 
@@ -143,22 +153,66 @@ export function logVerbose(message, data = null) {
   try {
     writeLine(STARTUP_LOG_FILE, 'VERBOSE', message, data);
   } catch (error) {
-    // Silently fail
+    if (!transportConnected) {
+      console.error(`VERBOSE LOG FAILED: ${error.message}`);
+    }
   }
 }
 
+export function markTransportConnected() {
+  transportConnected = true;
+  logStartup('[TRANSPORT] Client connected - stdio protocol now active');
+  logStartup('[TRANSPORT] Errors will no longer be written to stderr (would corrupt protocol)');
+  logStartup('[TRANSPORT] All errors must be captured in logs only');
+}
+
+export function getErrorBuffer() {
+  return errorBuffer;
+}
+
 export function logStartupError(message, error = null) {
-  try {
-    const timestamp = new Date().toISOString();
-    let logEntry = `[${timestamp}] ERROR: ${message}`;
-    if (error) {
-      logEntry += `\n[${timestamp}]   Message: ${error.message}`;
-      if (error.stack) {
-        logEntry += `\n[${timestamp}]   Stack: ${error.stack.split('\n').join(`\n[${timestamp}]   `)}`;
-      }
+  const timestamp = new Date().toISOString();
+  let logEntry = `[${timestamp}] ERROR: ${message}`;
+  if (error) {
+    logEntry += `\n[${timestamp}]   Message: ${error.message}`;
+    if (error.stack) {
+      logEntry += `\n[${timestamp}]   Stack: ${error.stack.split('\n').join(`\n[${timestamp}]   `)}`;
     }
+  }
+
+  let writeSucceeded = false;
+  try {
     appendFileSync(STARTUP_LOG_FILE, logEntry + '\n');
-  } catch (err) {
-    // Silently fail - don't write to stderr as it corrupts MCP protocol
+    writeSucceeded = true;
+  } catch (writeError) {
+    // Before transport: we can use stderr
+    if (!transportConnected) {
+      console.error(`\n${'='.repeat(60)}`);
+      console.error('CRITICAL LOGGER FAILURE:');
+      console.error(`Failed to write startup error log to: ${STARTUP_LOG_FILE}`);
+      console.error(`Reason: ${writeError.message}`);
+      console.error(`Original error was: ${message}`);
+      if (error?.message) console.error(`Error details: ${error.message}`);
+      console.error(`${'='.repeat(60)}\n`);
+      errorBuffer.push({
+        timestamp,
+        original: message,
+        logWriteFailed: writeError.message
+      });
+    }
+    // After transport: can't use stderr, but we tried our best
+  }
+
+  // If we couldn't write to startup.log, try writing to history.log as backup
+  if (!writeSucceeded) {
+    try {
+      appendFileSync(LOG_FILE, `[${timestamp}] FALLBACK ERROR: ${message}\n`);
+      if (error) {
+        appendFileSync(LOG_FILE, `[${timestamp}]   ${error.message}\n`);
+      }
+      writeSucceeded = true;
+    } catch (fallbackError) {
+      // Both logs failed - nothing we can do now
+    }
   }
 }

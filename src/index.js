@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { loadConfig } from './config.js';
 import { createClient } from './client-factory.js';
-import { initializeLogger, logRequest, logError, logSuccess, logStartup, logStartupError, getStartupLogFilePath, setLoggingEnabled, setVerboseMode, logVerbose } from './logger.js';
+import { initializeLogger, logRequest, logError, logSuccess, logStartup, logStartupError, getStartupLogFilePath, setLoggingEnabled, setVerboseMode, logVerbose, markTransportConnected } from './logger.js';
 import { tools, toolHandlers } from './tools/index.js';
 
 let server;
@@ -100,12 +100,19 @@ async function main() {
     logStartup(`  ✓ Validated ${tools.length} tools at import time`);
 
     server.setRequestHandler(ListToolsRequestSchema, async () => {
-      logStartup('LIST TOOLS REQUEST');
-      return { tools };
+      try {
+        logStartup('LIST TOOLS REQUEST');
+        logVerbose('Returning tools array', { toolCount: tools.length });
+        return { tools };
+      } catch (error) {
+        logStartupError('ERROR in ListToolsRequestSchema handler', error);
+        throw error;
+      }
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       let toolName = 'unknown';
+      const startTime = Date.now();
       try {
         const now = new Date().toISOString();
         logStartup('Tool request received');
@@ -132,9 +139,13 @@ async function main() {
 
         logVerbose(`Executing tool handler: ${name}`);
         const result = await handler(client, args || {}, config);
+        const duration = Date.now() - startTime;
 
         logSuccess(name);
-        logVerbose(`Tool completed successfully: ${name}`, { resultSize: JSON.stringify(result).length });
+        logVerbose(`Tool completed successfully: ${name}`, {
+          resultSize: JSON.stringify(result).length,
+          durationMs: duration
+        });
         return {
           content: [
             {
@@ -144,8 +155,14 @@ async function main() {
           ],
         };
       } catch (error) {
+        const duration = Date.now() - startTime;
         logError(toolName, error);
-        logStartupError(`Tool error during execution: ${toolName}`, error);
+        logStartupError(`Tool error during execution: ${toolName} (${duration}ms)`, error);
+        logVerbose(`Tool execution failed: ${toolName}`, {
+          durationMs: duration,
+          errorType: error.constructor.name,
+          code: error.code
+        });
 
         return {
           content: [
@@ -189,6 +206,7 @@ async function main() {
     );
     await Promise.race([server.connect(transport), connectTimeout]);
     logStartup('✓ Connected to stdio transport');
+    markTransportConnected();
     logStartup('✓ Rivanna MCP server started successfully');
     logStartup(`Server is ready and waiting for requests at ${new Date().toISOString()}`);
 
@@ -226,10 +244,20 @@ async function main() {
 
       // Periodically log that we're still alive and have listeners
       const aliveCheckInterval = setInterval(() => {
-        const handles = process._getActiveHandles?.().length ?? 0;
-        const reqs = process._getActiveRequests?.().length ?? 0;
-        logStartup(`  [Keep-alive check] Handles: ${handles}, Requests: ${reqs}, Time: ${new Date().toISOString()}`);
-      }, 5000);
+        try {
+          const handles = process._getActiveHandles?.().length ?? 0;
+          const reqs = process._getActiveRequests?.().length ?? 0;
+          const memory = process.memoryUsage();
+          logStartup(`  [Keep-alive check] Handles: ${handles}, Requests: ${reqs}, Memory: ${Math.round(memory.heapUsed / 1024 / 1024)}MB`);
+
+          // Detect potential deadlock: no handles and no requests is suspicious
+          if (handles === 0 && reqs === 0) {
+            logStartup('  ⚠️  WARNING: No active handles or requests! Server may be unresponsive.');
+          }
+        } catch (err) {
+          logStartup(`  [Keep-alive check ERROR] ${err.message}`);
+        }
+      }, 10000);
       aliveCheckInterval.unref();
 
       // This promise never resolves; process exits only via signals or transport close
@@ -262,24 +290,35 @@ main().catch((error) => {
 process.on('unhandledRejection', (reason, promise) => {
   if (isShuttingDown) return;
   const error = reason instanceof Error ? reason : new Error(String(reason));
-  logStartup(`UNHANDLED REJECTION: ${error.message}`);
+  const errorMsg = `UNHANDLED REJECTION at ${new Date().toISOString()}: ${error.message}`;
+
+  logStartup(errorMsg);
+  logStartup(`  Promise context: ${String(promise).substring(0, 200)}`);
   logStartupError('CRITICAL: Unhandled Promise Rejection', error);
   logVerbose('Unhandled rejection details', {
     promise: String(promise),
     errorType: error.constructor.name,
-    timestamp: new Date().toISOString(),
+    code: error.code,
+    stack: error.stack?.split('\n').slice(0, 5),
   });
+
   handleShutdown('unhandledRejection');
 });
 
 process.on('uncaughtException', (error) => {
   if (isShuttingDown) return;
-  logStartup(`UNCAUGHT EXCEPTION: ${error.message}`);
+  const errorMsg = `UNCAUGHT EXCEPTION at ${new Date().toISOString()}: ${error.message}`;
+
+  logStartup(errorMsg);
+  logStartup(`  Error type: ${error.constructor.name}`);
+  logStartup(`  Code: ${error.code || 'N/A'}`);
   logStartupError('CRITICAL: Uncaught Exception', error);
   logVerbose('Uncaught exception details', {
     errorType: error.constructor.name,
-    timestamp: new Date().toISOString(),
+    code: error.code,
+    stack: error.stack?.split('\n').slice(0, 5),
   });
+
   handleShutdown('uncaughtException');
 });
 
