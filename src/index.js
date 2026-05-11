@@ -100,13 +100,16 @@ async function main() {
     logStartup(`  ✓ Validated ${tools.length} tools at import time`);
 
     server.setRequestHandler(ListToolsRequestSchema, async () => {
+      logStartup(`[LIST TOOLS REQUEST at ${new Date().toISOString()}]`);
       return { tools };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       let toolName = 'unknown';
       try {
-        logVerbose('Received tool request', { timestamp: new Date().toISOString() });
+        const now = new Date().toISOString();
+        logStartup(`[TOOL REQUEST at ${now}] Received request`);
+        logVerbose('Received tool request', { timestamp: now });
 
         if (!request.params || typeof request.params !== 'object') {
           throw new McpError(ErrorCode.InvalidRequest, 'Request must have params object');
@@ -246,6 +249,7 @@ main().catch((error) => {
 process.on('unhandledRejection', (reason, promise) => {
   if (isShuttingDown) return;
   const error = reason instanceof Error ? reason : new Error(String(reason));
+  logStartup(`[UNHANDLED REJECTION at ${new Date().toISOString()}] ${error.message}`);
   logStartupError('CRITICAL: Unhandled Promise Rejection', error);
   logVerbose('Unhandled rejection details', {
     promise: String(promise),
@@ -257,6 +261,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
   if (isShuttingDown) return;
+  logStartup(`[UNCAUGHT EXCEPTION at ${new Date().toISOString()}] ${error.message}`);
   logStartupError('CRITICAL: Uncaught Exception', error);
   logVerbose('Uncaught exception details', {
     errorType: error.constructor.name,
@@ -264,3 +269,6 @@ process.on('uncaughtException', (error) => {
   });
   handleShutdown('uncaughtException');
 });
+
+process.on('exit', (code) => {
+  logStartup(`[PROCESS EXIT at ${new Date().toISOString()}] Exit code: ${code}`);
