@@ -23,7 +23,7 @@ async function main() {
     logStartup('✓ Configuration loaded');
 
     logStartup('Step 2: Initializing logger...');
-    initializeLogger(config);
+    initializeLogger();
     loggingEnabled = config.logging !== false;
     logStartup('✓ Logger initialized');
     logStartup(`  Startup log file: ${getStartupLogFilePath()}`);
@@ -52,14 +52,41 @@ async function main() {
     logStartup('✓ MCP server created');
 
     logStartup('Step 5: Registering tool handlers...');
+
+    // Validate tool definitions
+    const toolNames = new Set();
+    for (const tool of tools) {
+      if (!tool.name || typeof tool.name !== 'string') {
+        throw new Error(`Invalid tool definition: missing or invalid name`);
+      }
+      if (toolNames.has(tool.name)) {
+        throw new Error(`Duplicate tool name: ${tool.name}`);
+      }
+      if (!toolHandlers.has(tool.name)) {
+        throw new Error(`Tool handler not registered for: ${tool.name}`);
+      }
+      toolNames.add(tool.name);
+    }
+    logStartup(`  ✓ Validated ${tools.length} tools`);
+
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       return { tools };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      let toolName = 'unknown';
       try {
-        const { name, arguments: args } = request.params || request;
+        if (!request.params || typeof request.params !== 'object') {
+          throw new McpError(ErrorCode.InvalidRequest, 'Request must have params object');
+        }
 
+        const { name, arguments: args } = request.params;
+
+        if (!name || typeof name !== 'string') {
+          throw new McpError(ErrorCode.InvalidRequest, 'Tool name must be a non-empty string');
+        }
+
+        toolName = name;
         logRequest(name, args, loggingEnabled);
 
         const handler = toolHandlers.get(name);
@@ -79,8 +106,7 @@ async function main() {
           ],
         };
       } catch (error) {
-        const { name } = request.params || request;
-        logError(name, error, loggingEnabled);
+        logError(toolName, error, loggingEnabled);
 
         return {
           content: [
@@ -100,8 +126,8 @@ async function main() {
     logStartup('  Transport created, attempting connection...');
 
     transport.onclose = () => {
-      logStartup('WARNING: Transport closed!');
-      process.exit(0);
+      logStartup('WARNING: Transport closed unexpectedly!');
+      process.exit(1);
     };
 
     transport.onerror = (error) => {
@@ -113,28 +139,12 @@ async function main() {
     logStartup('✓ Connected to stdio transport');
     logStartup('✓ Rivanna MCP server started successfully');
     logStartup('Server is ready and waiting for requests...');
-    logStartup('Entering idle loop (waiting for requests)...');
 
-    // Keep the process alive indefinitely with a heartbeat
-    const heartbeatInterval = setInterval(() => {
-      // Silent heartbeat - just keeps process alive
-    }, 30000);
-    heartbeatInterval.ref(); // Keep this interval from allowing exit
-    logStartup('✓ Heartbeat started');
-
-    // Keep the process alive indefinitely
-    const idlePromise = new Promise(() => {
-      logStartup('Promise created, waiting for requests...');
+    // Keep process alive indefinitely by creating a never-resolving promise
+    // The transport maintains active stdio listeners, keeping stdin/stdout alive
+    await new Promise(() => {
+      // This promise never resolves; process exits only via signals or transport close
     });
-
-    logStartup('About to await idle promise...');
-    try {
-      await idlePromise;
-      logStartup('ERROR: Idle promise resolved (should never happen)');
-    } catch (err) {
-      logStartupError('Error in idle promise', err);
-      throw err;
-    }
   } catch (error) {
     logStartupError('Failed to initialize server', error);
     process.exit(1);
@@ -150,10 +160,14 @@ process.on('SIGINT', () => {
   try {
     logStartup('Received SIGINT, shutting down gracefully...');
   } catch (e) {
-    console.error('Failed to log shutdown:', e);
+    // Silently fail - don't corrupt MCP protocol
   }
   if (client) {
-    client.close();
+    try {
+      client.close();
+    } catch (error) {
+      logStartupError('Error closing client', error);
+    }
   }
   process.exit(0);
 });

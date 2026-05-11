@@ -6,13 +6,25 @@ const CONFIG_DIR = join(homedir(), '.rivanna-mcp');
 const LOG_FILE = join(CONFIG_DIR, 'history.log');
 const STARTUP_LOG_FILE = join(CONFIG_DIR, 'startup.log');
 
+let loggerInitialized = false;
+
 export function initializeLogger() {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+  try {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    // Test write access before marking as initialized
+    appendFileSync(STARTUP_LOG_FILE, '');
+    loggerInitialized = true;
+    logStartup('='.repeat(60));
+    logStartup(`Server startup at ${new Date().toISOString()}`);
+    logStartup('='.repeat(60));
+  } catch (error) {
+    console.error(`\n❌ Failed to initialize logger: ${error.message}`);
+    console.error(`   Log directory: ${CONFIG_DIR}`);
+    console.error(`   Ensure directory exists and is writable.\n`);
+    throw error;
   }
-  logStartup('='.repeat(60));
-  logStartup(`Server startup at ${new Date().toISOString()}`);
-  logStartup('='.repeat(60));
 }
 
 export function logStartup(message) {
