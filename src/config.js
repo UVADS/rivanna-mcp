@@ -15,6 +15,12 @@ export function loadConfig() {
   try {
     const config = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
     validateConfig(config);
+
+    // Enable verbose mode from environment variable (useful for debugging)
+    if (process.env.RIVANNA_VERBOSE === 'true' || process.env.RIVANNA_VERBOSE === '1') {
+      config.verbose = true;
+    }
+
     return config;
   } catch (error) {
     console.error(`\nConfiguration error: ${error.message}`);

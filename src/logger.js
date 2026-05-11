@@ -8,6 +8,7 @@ const STARTUP_LOG_FILE = join(CONFIG_DIR, 'startup.log');
 
 let loggerInitialized = false;
 let loggingEnabled = true;
+let verboseMode = false;
 
 export function initializeLogger() {
   try {
@@ -131,6 +132,19 @@ export function getStartupLogFilePath() {
 
 export function setLoggingEnabled(enabled) {
   loggingEnabled = enabled;
+}
+
+export function setVerboseMode(enabled) {
+  verboseMode = enabled;
+}
+
+export function logVerbose(message, data = null) {
+  if (!verboseMode) return;
+  try {
+    writeLine(STARTUP_LOG_FILE, 'VERBOSE', message, data);
+  } catch (error) {
+    // Silently fail
+  }
 }
 
 export function logStartupError(message, error = null) {
