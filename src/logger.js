@@ -4,10 +4,25 @@ import { homedir } from 'os';
 
 const CONFIG_DIR = join(homedir(), '.rivanna-mcp');
 const LOG_FILE = join(CONFIG_DIR, 'history.log');
+const STARTUP_LOG_FILE = join(CONFIG_DIR, 'startup.log');
 
 export function initializeLogger() {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  logStartup('='.repeat(60));
+  logStartup(`Server startup at ${new Date().toISOString()}`);
+  logStartup('='.repeat(60));
+}
+
+export function logStartup(message) {
+  try {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}`;
+    appendFileSync(STARTUP_LOG_FILE, logEntry + '\n');
+    console.error(logEntry);
+  } catch (error) {
+    console.error('Failed to write startup log:', error.message);
   }
 }
 
@@ -74,4 +89,25 @@ export function logSuccess(toolName, loggingEnabled) {
 
 export function getLogFilePath() {
   return LOG_FILE;
+}
+
+export function getStartupLogFilePath() {
+  return STARTUP_LOG_FILE;
+}
+
+export function logStartupError(message, error = null) {
+  try {
+    const timestamp = new Date().toISOString();
+    let logEntry = `[${timestamp}] ERROR: ${message}`;
+    if (error) {
+      logEntry += `\n[${timestamp}]   Message: ${error.message}`;
+      if (error.stack) {
+        logEntry += `\n[${timestamp}]   Stack: ${error.stack.split('\n').join(`\n[${timestamp}]   `)}`;
+      }
+    }
+    appendFileSync(STARTUP_LOG_FILE, logEntry + '\n');
+    console.error(`ERROR: ${message}`, error);
+  } catch (err) {
+    console.error('Failed to write startup error log:', err.message);
+  }
 }

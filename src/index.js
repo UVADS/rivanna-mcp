@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { loadConfig } from './config.js';
 import { createClient } from './client-factory.js';
-import { initializeLogger, logRequest, logError, logSuccess } from './logger.js';
+import { initializeLogger, logRequest, logError, logSuccess, logStartup, logStartupError, getStartupLogFilePath } from './logger.js';
 import { tools, toolHandlers } from './tools/index.js';
 
 let server;
@@ -20,20 +20,26 @@ async function main() {
   console.error('Rivanna MCP server starting...');
 
   try {
-    console.error('Loading configuration...');
+    logStartup('Step 1: Loading configuration...');
     config = loadConfig();
-    console.error('Configuration loaded');
+    logStartup('✓ Configuration loaded');
 
-    console.error('Initializing logger...');
+    logStartup('Step 2: Initializing logger...');
     initializeLogger(config);
     loggingEnabled = config.logging !== false;
-    console.error('Logger initialized');
+    logStartup('✓ Logger initialized');
+    logStartup(`  Startup log file: ${getStartupLogFilePath()}`);
 
-    console.error('Creating client...');
-    client = createClient(config);
-    console.error('Client created');
+    logStartup('Step 3: Creating client...');
+    try {
+      client = createClient(config);
+      logStartup('✓ Client created successfully');
+    } catch (clientError) {
+      logStartupError('Failed to create client', clientError);
+      throw clientError;
+    }
 
-    console.error('Creating MCP server...');
+    logStartup('Step 4: Creating MCP server...');
     server = new Server(
       {
         name: 'rivanna-mcp',
@@ -45,7 +51,9 @@ async function main() {
         },
       }
     );
+    logStartup('✓ MCP server created');
 
+    logStartup('Step 5: Registering tool handlers...');
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       return { tools };
     });
@@ -87,40 +95,83 @@ async function main() {
         };
       }
     });
+    logStartup('✓ Tool handlers registered');
 
-    console.error('Connecting to stdio transport...');
+    logStartup('Step 6: Connecting to stdio transport...');
     const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error('Rivanna MCP server started');
+    logStartup('  Transport created, attempting connection...');
 
-    // Keep the process alive
-    await new Promise(() => {});
+    transport.onclose = () => {
+      logStartup('WARNING: Transport closed!');
+      process.exit(0);
+    };
+
+    transport.onerror = (error) => {
+      logStartupError('Transport error', error);
+      process.exit(1);
+    };
+
+    await server.connect(transport);
+    logStartup('✓ Connected to stdio transport');
+    logStartup('✓ Rivanna MCP server started successfully');
+    logStartup('Server is ready and waiting for requests...');
+    logStartup('Entering idle loop (waiting for requests)...');
+
+    // Prevent Node.js from exiting by keeping stdin/stdout active
+    process.stdin.setEncoding('utf8');
+    process.stdin.resume();
+    logStartup('✓ Stdin resumed to keep process alive');
+
+    // Keep the process alive indefinitely with a heartbeat
+    const heartbeatInterval = setInterval(() => {
+      // Silent heartbeat - just keeps process alive
+    }, 30000);
+    heartbeatInterval.ref(); // Keep this interval from allowing exit
+    logStartup('✓ Heartbeat started');
+
+    // Keep the process alive indefinitely
+    const idlePromise = new Promise(() => {
+      logStartup('Promise created, waiting for requests...');
+    });
+
+    logStartup('About to await idle promise...');
+    try {
+      await idlePromise;
+      logStartup('ERROR: Idle promise resolved (should never happen)');
+    } catch (err) {
+      logStartupError('Error in idle promise', err);
+      throw err;
+    }
   } catch (error) {
-    console.error('Failed to initialize server:', error.message);
-    console.error(error.stack);
+    logStartupError('Failed to initialize server', error);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error('Failed to start server:', error);
+  logStartupError('Failed to start server', error);
   process.exit(1);
 });
 
 process.on('SIGINT', () => {
+  try {
+    logStartup('Received SIGINT, shutting down gracefully...');
+  } catch (e) {
+    console.error('Failed to log shutdown:', e);
+  }
   if (client) {
     client.close();
   }
   process.exit(0);
 });
 
-// Catch unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logStartupError('Unhandled Promise Rejection', error);
   process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logStartupError('Uncaught Exception', error);
   process.exit(1);
 });
