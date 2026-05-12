@@ -242,7 +242,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const finalOutputPath = outputPath || `${jobDir}/%j.out`; // Use %j for job ID
   const finalErrorPath = errorPath || `${jobDir}/%j.err`;
 
-  let slurmScript = `#!/bin/bash\n#SBATCH --job-name=${finalJobName}\n#SBATCH --account=${resolvedAllocation}\n#SBATCH --partition=${finalPartition}\n#SBATCH --nodes=${finalNodes}\n#SBATCH --cpus-per-task=${finalCpus}\n#SBATCH --mem=${finalMemory}\n#SBATCH --time=${finalTime}\n#SBATCH --output=${finalOutputPath}\n#SBATCH --error=${finalErrorPath}`;
+  let slurmScript = `#!/bin/bash\n#SBATCH --job-name=${finalJobName}\n#SBATCH --account=${resolvedAllocation}\n#SBATCH --partition=${finalPartition}\n#SBATCH --nodes=${finalNodes}\n#SBATCH --cpus-per-task=${finalCpus}\n#SBATCH --mem=${finalMemory}\n#SBATCH --time=${finalTime}\n#SBATCH --chdir=${jobDir}\n#SBATCH --output=${finalOutputPath}\n#SBATCH --error=${finalErrorPath}`;
 
   if (gpus) {
     slurmScript += `\n#SBATCH --gpus-per-node=${gpus}`;
