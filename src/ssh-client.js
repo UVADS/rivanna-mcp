@@ -1,5 +1,5 @@
 import { execCommand } from './command-runner.js';
-import { statSync } from 'fs';
+import { statSync, readFileSync } from 'fs';
 
 class SSHClient {
   constructor(host = 'login.hpc.virginia.edu', username, privateKeyPath) {
@@ -34,14 +34,14 @@ class SSHClient {
     }
 
     const escapeQuote = (str) => str.replace(/'/g, "'\"'\"'");
-    const escapedLocal = escapeQuote(localPath);
     const escapedRemote = escapeQuote(fullRemotePath);
 
+    // base64-encode locally and decode on remote — avoids stream truncation in the cat|ssh pipe
+    const base64Content = readFileSync(localPath, 'base64');
     const sshOptions = this.getSSHOptions().join(' ');
-    const shellCmd = `cat '${escapedLocal}' | ssh ${sshOptions} ${this.username}@${this.host} 'cat > '\\''${escapedRemote}'\\''  && sync'`;
+    const shellCmd = `echo '${base64Content}' | ssh ${sshOptions} ${this.username}@${this.host} 'base64 -d > '\''${escapedRemote}'\'''`;
 
-    const args = ['-c', shellCmd];
-    await execCommand('bash', args, { timeout, errorPrefix: 'File transfer failed' });
+    await execCommand('bash', ['-c', shellCmd], { timeout, errorPrefix: 'File transfer failed' });
 
     // Verify file size
     const remoteSize = await this.exec(`wc -c < '${escapedRemote}' | tr -d ' '`);
