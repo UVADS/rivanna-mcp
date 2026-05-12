@@ -470,6 +470,83 @@ Execute arbitrary shell commands directly on Rivanna and get the output back to 
 - "Show me the 5 largest files in my home directory"
 - "Execute: `du -sh /scratch/mst3k/* | sort -h`"
 
+## Planned: Project Configuration with `rivanna.yaml`
+
+A proposed feature (not yet shipped) that lets each project carry a declarative file describing exactly what environment its SLURM jobs need — modules, language runtime, package installs, environment variables, and pre-/post-job hooks. The submitter consumes this file and produces a reproducible SLURM script, removing guesswork from the submission flow.
+
+### The file: `rivanna.yaml`
+
+A single YAML file at the project root that declares the full job environment:
+
+```yaml
+# rivanna.yaml — environment declaration for SLURM submissions
+version: 1
+
+slurm:
+  partition: gpu
+  time: "04:00:00"
+  cpus: 8
+  memory: 32G
+  gpus: 1
+  account: my-allocation
+
+modules:
+  - miniforge
+  - cuda/12.4
+
+language:
+  kind: python                  # python | r | none
+  version: "3.11"
+  env_manager: venv             # venv | conda | pipenv | none
+  env_name: .venv
+  requirements: requirements.txt
+
+env:
+  WANDB_PROJECT: my-project
+  HF_HOME: /scratch/$USER/huggingface
+
+pre_job:
+  - "mkdir -p /scratch/$USER/huggingface"
+
+post_job:
+  - "echo Finished at $(date)"
+
+entrypoint: "python train.py"
+```
+
+### The tool: `create_job_template`
+
+A new MCP tool that scans the current project and writes a commented `rivanna.yaml` stub the user can edit before submitting. The user runs it once per project; from then on, `submit_job` reads the file and skips the interview flow.
+
+**What it does:**
+
+1. **Detects language** — looks for `*.py` + `requirements.txt` / `Pipfile`, or `*.R` + `install.R` / `DESCRIPTION`
+2. **Detects intent** — greps imports for `torch` / `tensorflow` / `cupy` and suggests a GPU partition; `mpi4py` suggests a parallel partition
+3. **Reads your SLURM preferences** — pulls `time`, `partition`, `cpus`, `memory`, `nodes`, and `allocation` from `~/.rivanna-mcp/slurm-defaults.json`
+4. **Annotates every default** — each field gets a `# from slurm-defaults.json` or `# detected: ...` comment so you can see at a glance which values came from your preferences versus the tool's guess
+5. **Never overwrites silently** — refuses if `rivanna.yaml` already exists unless `overwrite=true`, and always writes a timestamped `.bak` first
+
+### Source-of-authority rule
+
+`~/.rivanna-mcp/slurm-defaults.json` is the **single source of authority** for user-wide SLURM defaults. The generator reads it but never writes to it. If you want to change your defaults, update them once via the setup command — the next `create_job_template` run picks them up automatically.
+
+| File                                       | Role                                              | Written by         |
+|--------------------------------------------|---------------------------------------------------|--------------------|
+| `~/.rivanna-mcp/slurm-defaults.json`       | User-wide defaults (one place to edit)            | Setup command only |
+| `<project>/rivanna.yaml`                   | Per-project environment declaration               | `create_job_template` + user edits |
+| Generated SLURM script                     | What actually runs (consumes `rivanna.yaml`)      | `submit_job`       |
+
+### Value precedence at generation time
+
+```
+1. Project detection (e.g., torch import → partition: gpu)   [highest]
+2. ~/.rivanna-mcp/slurm-defaults.json
+3. ~/.rivanna-mcp/config.json (defaultAllocation only)
+4. Built-in fallback (e.g., partition: standard)             [lowest]
+```
+
+Detection only outranks preferences when the signal is strong (GPU imports, MPI imports). For ambiguous values like time, memory, and CPUs, your preferences always win — they are a stronger signal than the tool's guess.
+
 ## Troubleshooting
 
 ### "Configuration not found"
