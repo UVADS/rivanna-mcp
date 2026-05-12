@@ -162,6 +162,18 @@ export async function runSetup() {
   }
 
   dynamicQuestions.push({
+    type: 'input',
+    name: 'slurmJobsPath',
+    message: 'Folder name in your Rivanna $HOME for SLURM job directories',
+    default: 'rivanna-jobs',
+    validate: (input) => {
+      if (!input.trim()) return 'Folder name cannot be empty';
+      if (input.includes('/')) return 'Enter a folder name only (no slashes) — it will be created inside your $HOME';
+      return true;
+    },
+  });
+
+  dynamicQuestions.push({
     type: 'confirm',
     name: 'logging',
     message: 'Enable logging of MCP interactions to ~/.rivanna-mcp/history.log?',
@@ -226,6 +238,7 @@ export async function runSetup() {
     userIsRemote,
     hpcHost: HPC_HOST,
     logging: answers.logging,
+    slurmJobsPath: answers.slurmJobsPath.trim(),
     createdAt: new Date().toISOString(),
   };
 
@@ -255,6 +268,7 @@ export async function runSetup() {
     console.log(`   SSH Key: ${config.sshKeyPath}`);
   }
   console.log(`   HPC Host: ${config.hpcHost}`);
+  console.log(`   SLURM Jobs Folder: ~/${config.slurmJobsPath}`);
   console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
   if (defaultAllocation) {
     console.log(`   Default Allocation: ${defaultAllocation}`);

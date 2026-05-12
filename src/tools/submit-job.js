@@ -183,11 +183,15 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   const homeDir = await sshClient.exec('echo $HOME');
   const homePath = homeDir.trim();
 
-  // Create a per-job directory to keep $HOME clean
-  // Format: ~/rivanna-jobs/jobname_timestamp/
+  // Resolve Tier-1 jobs folder: absolute path if configured that way, else relative to $HOME
+  const slurmJobsFolder = config?.slurmJobsPath || 'rivanna-jobs';
+  const tier1Dir = slurmJobsFolder.startsWith('/') ? slurmJobsFolder : `${homePath}/${slurmJobsFolder}`;
+
+  // Create a per-job directory inside the Tier-1 folder
+  // Format: <tier1Dir>/jobname_timestamp/
   const timestamp = Date.now();
   const jobDirName = `${finalJobName}_${timestamp}`;
-  const jobDir = `${homePath}/rivanna-jobs/${jobDirName}`;
+  const jobDir = `${tier1Dir}/${jobDirName}`;
 
   // Create the job directory
   await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
@@ -353,7 +357,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 export const submitJobTool = {
   name: 'submit_job',
   description:
-    'Create and optionally submit a SLURM job script to Rivanna HPC cluster with smart resource configuration and automatic project setup. Generates SLURM job script with specified resources, auto-detects language (Python/R) and dependencies (requirements.txt/Pipfile/renv.lock), transfers local code and data files to cluster, loads appropriate environment modules, installs dependencies, and optionally submits the job to the scheduler. Creates isolated job directory (~/rivanna-jobs/jobname_timestamp/). Returns job script content, job ID, submission status, and which files were transferred. Primary tool for launching computations on Rivanna; pair with list_jobs to monitor and cancel_job to stop jobs. Sensible defaults for all resource parameters, so minimum call is just: {scriptContent: "your bash commands"}.',
+    'Create and optionally submit a SLURM job script to Rivanna HPC cluster with smart resource configuration and automatic project setup. Generates SLURM job script with specified resources, auto-detects language (Python/R) and dependencies (requirements.txt/Pipfile/renv.lock), transfers local code and data files to cluster, loads appropriate environment modules, installs dependencies, and optionally submits the job to the scheduler. Creates isolated job directory inside your configured SLURM jobs folder (default: ~/rivanna-jobs/jobname_timestamp/). Returns job script content, job ID, submission status, and which files were transferred. Primary tool for launching computations on Rivanna; pair with list_jobs to monitor and cancel_job to stop jobs. Sensible defaults for all resource parameters, so minimum call is just: {scriptContent: "your bash commands"}.',
   inputSchema: {
     type: 'object',
     properties: {
