@@ -1,6 +1,6 @@
 {
   "name": "rivanna-mcp",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "MCP server for comprehensive Rivanna HPC cluster management and monitoring. Provides tools for job submission and cancellation, real-time job status tracking, compute resource visibility, storage quota and disk usage monitoring, allocation and billing information, cluster capacity trending, and remote command execution. Supports both local execution on the cluster and remote SSH access from workstations with automatic language detection for Python and R project submission, dependency management, and interactive HPC workflows.",
   "type": "module",
   "main": "src/index.js",
