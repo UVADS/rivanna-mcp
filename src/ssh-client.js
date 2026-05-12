@@ -1,6 +1,5 @@
 import { execCommand } from './command-runner.js';
 import { statSync, readFileSync } from 'fs';
-import { spawn } from 'child_process';
 
 class SSHClient {
   constructor(host = 'login.hpc.virginia.edu', username, privateKeyPath) {
@@ -36,35 +35,11 @@ class SSHClient {
     const escapeQuote = (str) => str.replace(/'/g, "'\"'\"'");
     const escapedRemote = escapeQuote(fullRemotePath);
 
-    // Pipe base64-encoded content directly to SSH stdin; remote decodes it.
-    // Spawns SSH the same way exec() does, with stdin set to 'pipe' so we can write to it.
+    // Rivanna's zsh login shell consumes SSH stdin as commands before the remote process
+    // can read it. Embed base64 content in the command string via printf instead — no stdin needed.
     const base64Content = readFileSync(localPath, 'base64');
-    const remoteCmd = `base64 -d > '${escapedRemote}'`;
-    const sshArgs = [...this.getSSHOptions(), `${this.username}@${this.host}`, remoteCmd];
-
-    await new Promise((resolve, reject) => {
-      const proc = spawn('ssh', sshArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-      let stderr = '';
-      let timedOut = false;
-
-      const timeoutId = setTimeout(() => {
-        timedOut = true;
-        proc.kill();
-        reject(new Error(`File transfer timed out after ${timeout}ms`));
-      }, timeout);
-
-      proc.stderr.on('data', (d) => { stderr += d; });
-      proc.on('close', (code) => {
-        clearTimeout(timeoutId);
-        if (timedOut) return;
-        if (code === 0) resolve();
-        else reject(new Error(`File transfer failed: ${stderr || `exit code ${code}`}`));
-      });
-      proc.on('error', (err) => { clearTimeout(timeoutId); reject(err); });
-
-      proc.stdin.write(base64Content);
-      proc.stdin.end();
-    });
+    const remoteCmd = `printf '%s' '${base64Content}' | bash -c 'base64 -d > '"'"'${escapedRemote}'"'"''`;
+    await this.exec(remoteCmd, timeout);
 
     // Verify file size
     const remoteSize = await this.exec(`wc -c < '${escapedRemote}' | tr -d ' '`);
