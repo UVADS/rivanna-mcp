@@ -94,7 +94,7 @@ The twelve tools in the Rivanna MCP are:
 11. **SSH Login** — Opens an interactive SSH session to Rivanna's login node using your configured credentials.
 12. **Execute Command** — Runs an arbitrary shell command on Rivanna and returns its output directly to your IDE.
 
-You can read more detail about each tool below.
+Read more detail about each tool with examples below.
 
 ## Installation
 
@@ -272,7 +272,7 @@ Once configured (either running manually or via settings.json), you'll have acce
 
 ## Available Tools
 
-### `get_cluster_overview`
+### Cluster Overview
 Get a comprehensive snapshot of the entire Rivanna cluster including capacity usage, GPU availability, node status, and 24-hour trends.
 
 **Parameters:**
@@ -283,7 +283,7 @@ None
 - "What's the current state of the cluster?"
 - "Show me cluster capacity, GPU types, and 24-hour trends"
 
-### `get_cluster_usage_24h`
+### Cluster Usage (24h)
 Get cluster CPU and memory usage trends for the last 24 hours with colored ASCII graphics.
 
 **Parameters:**
@@ -294,7 +294,7 @@ None
 - "Show me the cluster usage trends for the last 24 hours"
 - "Is the cluster busy right now?"
 
-### `get_node_resources`
+### Node Resources
 Get available compute nodes and their resource status.
 
 **Parameters:**
@@ -306,7 +306,7 @@ Get available compute nodes and their resource status.
 - "Show me detailed resource info for the standard partition"
 - "What's the status of compute nodes in the gpu partition?"
 
-### `get_storage_quota`
+### Storage Quota
 Check filesystem quotas across all mounted filesystems.
 
 **Parameters:**
@@ -317,7 +317,7 @@ Check filesystem quotas across all mounted filesystems.
 - "Check my quota on the home filesystem"
 - "Show me disk usage across all filesystems"
 
-### `get_directory_usage`
+### Directory Usage
 Get disk usage for a specific directory.
 
 **Parameters:**
@@ -328,7 +328,7 @@ Get disk usage for a specific directory.
 - "Show me the largest files in my home directory"
 - "What's the disk usage in my scratch folder?"
 
-### `get_allocation_info`
+### Allocation Info
 View resource allocation limits for users and accounts.
 
 **Parameters:**
@@ -339,7 +339,7 @@ View resource allocation limits for users and accounts.
 - "Tell me about my compute hour budget"
 - "Show allocation info for user mst3k"
 
-### `get_job_history`
+### Job History
 Get historical job accounting and compute hour usage over a time period.
 
 **Parameters:**
@@ -351,7 +351,7 @@ Get historical job accounting and compute hour usage over a time period.
 - "Show me my job history for the last 60 days"
 - "What's my historical job accounting?"
 
-### `submit_job`
+### Submit Job
 Create and optionally submit a SLURM job file to Rivanna with configurable resources and automatic module loading.
 
 **Default Values (presented for user confirmation):**
@@ -447,7 +447,7 @@ Claude will interview you for the required parameters, recommend appropriate mod
 4. You can review it or let Claude submit it
 5. Your job files are organized in a dedicated directory
 
-### `list_jobs`
+### List Jobs
 Query the SLURM job queue and list all jobs with flexible filtering.
 
 **Parameters:**
@@ -460,7 +460,7 @@ Query the SLURM job queue and list all jobs with flexible filtering.
 - "What jobs have failed?"
 - "How many pending jobs do I have?"
 
-### `cancel_job`
+### Cancel Job
 Cancel a running or pending SLURM job by ID.
 
 **Parameters:**
@@ -472,7 +472,7 @@ Cancel a running or pending SLURM job by ID.
 - "Kill job 1234567 with SIGKILL"
 - "Stop my running job"
 
-### `ssh_login`
+### SSH Login
 Open an interactive SSH session directly to Rivanna's login node using your configured credentials and SSH key.
 
 **Parameters:**
@@ -483,7 +483,7 @@ None
 - "Open an SSH session to the login node"
 - "Let me SSH into Rivanna"
 
-### `exec_command`
+### Execute Command
 Execute arbitrary shell commands directly on Rivanna and get the output back to your IDE.
 
 **Parameters:**
