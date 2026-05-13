@@ -540,7 +540,9 @@ export async function submitJob(sshClient, options = {}, config = {}) {
 export const submitJobTool = {
   name: 'submit_job',
   description:
-    'Create and optionally submit a SLURM job to Rivanna using a rivanna.yaml file as the job specification. ' +
+    'THIS IS THE ONLY CORRECT WAY TO SUBMIT SLURM JOBS ON RIVANNA. ' +
+    'Do not use exec_command, sbatch directly, or any other tool for job submission — always use this tool. ' +
+    'Creates and submits a SLURM job using a rivanna.yaml file as the job specification. ' +
     'rivanna.yaml defines everything: SLURM resource parameters (account, partition, CPUs, memory, time, GPUs), ' +
     'which modules to load (any language — Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI, etc.), ' +
     'environment setup commands (activate venvs, pip install, export vars), ' +
