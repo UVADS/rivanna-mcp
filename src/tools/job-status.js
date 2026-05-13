@@ -1,10 +1,24 @@
 import { parseLineDelimited, shellQuote } from '../utils.js';
 
+function parseElapsedHours(elapsed) {
+  if (!elapsed || elapsed === '0:00') return 0;
+  let days = 0, hours = 0, minutes = 0, seconds = 0;
+  if (elapsed.includes('-')) {
+    const [d, rest] = elapsed.split('-');
+    days = parseInt(d, 10);
+    elapsed = rest;
+  }
+  const parts = elapsed.split(':').map(Number);
+  if (parts.length === 3) [hours, minutes, seconds] = parts;
+  else if (parts.length === 2) [minutes, seconds] = parts;
+  return days * 24 + hours + minutes / 60 + seconds / 3600;
+}
+
 export async function listJobs(sshClient, options = {}) {
   const { state = 'all', user, limit = 100 } = options;
 
-  // Use simple pipe-delimited format for reliable parsing
-  let command = `squeue --format='%i|%P|%j|%u|%T|%M|%l|%D|%R'`;
+  // %i=job_id %j=name %S=start_time %T=state %M=elapsed %C=cpus
+  let command = `squeue --format='%i|%j|%S|%T|%M|%C'`;
 
   if (state !== 'all') {
     command += ` --states=${shellQuote(state)}`;
@@ -19,20 +33,21 @@ export async function listJobs(sshClient, options = {}) {
 
   let jobs = lines.slice(1).map(line => {
     const parts = line.split('|');
+    const elapsed = parts[4] || '';
+    const cpus = parseInt(parts[5], 10) || 0;
+    const rawDatetime = parts[2] || '';
+    const datetime = (rawDatetime === 'N/A' || rawDatetime === 'Unknown') ? '' : rawDatetime;
+    const cpu_hours = Math.round(parseElapsedHours(elapsed) * cpus * 100) / 100;
     return {
       job_id: parts[0],
-      partition: parts[1],
-      name: parts[2],
-      user: parts[3],
-      status: parts[4],
-      time_used: parts[5],
-      time_limit: parts[6],
-      nodes: parts[7],
-      node_list: parts[8],
+      name: parts[1],
+      datetime,
+      state: parts[3],
+      elapsed,
+      cpu_hours,
     };
   });
 
-  // Limit results if needed
   if (limit && jobs.length > limit) {
     jobs = jobs.slice(0, limit);
   }
@@ -47,7 +62,7 @@ export async function listJobs(sshClient, options = {}) {
 export const listJobsTool = {
   name: 'list_jobs',
   description:
-    'Query the SLURM job queue to monitor and track all jobs on Rivanna HPC cluster. Returns detailed information for each job: job_id (SLURM identifier), partition (which queue it\'s in: standard/parallel/gpu/largemem), job name, user/owner, current status, time elapsed, time remaining until limit, node count allocated, and specific node list. Use this tool to: (1) monitor long-running computations and check progress, (2) verify jobs submitted via submit_job actually started, (3) check queue backlog and estimate when your pending job will run, (4) identify stuck or failed jobs that need investigation with get_allocation_info, (5) understand cluster utilization patterns, (6) find job_id values needed to cancel jobs with cancel_job. Supports efficient filtering by job state, user, and result limits for large clusters.',
+    'Query the SLURM job queue to monitor and track jobs on the Rivanna HPC cluster. Returns per-job columns: job_id, name, datetime (start time when running; blank when pending), state, elapsed time, and cpu_hours (elapsed × CPUs). Use this tool to: (1) monitor long-running computations and check progress, (2) verify jobs submitted via submit_job actually started, (3) check queue backlog and estimate when pending jobs will run, (4) identify stuck or failed jobs, (5) track CPU-hour consumption, (6) find job_id values needed by cancel_job. Supports filtering by state, user, and result limit.',
   inputSchema: {
     type: 'object',
     properties: {
