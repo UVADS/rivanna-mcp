@@ -1,7 +1,7 @@
 import { parseLineDelimited, shellQuote } from '../utils.js';
 
-export async function getAllocationInfo(sshClient, options = {}) {
-  const { user } = options;
+export async function getAllocationInfo(sshClient, options = {}, config = {}) {
+  const { user = config.computingId } = options;
 
   let command = `sacctmgr show assoc format=cluster,account,user,maxcpus,maxnode,maxwall,grpcpumins -p`;
 
@@ -96,14 +96,14 @@ function parseMamBalanceOutput(output) {
   return accounts;
 }
 
-export async function getJobHistory(sshClient, options = {}) {
-  const { user, days = 30 } = options;
+export async function getJobHistory(sshClient, options = {}, config = {}) {
+  const { user = config.computingId, days = 30 } = options;
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   const dateStr = startDate.toISOString().split('T')[0];
 
-  let command = `sacct --format=jobid,jobname,user,account,state,elapsed,cputimeraw,maxvmsize --noheader --start=${dateStr}`;
+  let command = `sacct --format=jobid,jobname,user,account,state,start,elapsed,cputimeraw,maxvmsize --noheader --start=${dateStr}`;
 
   if (user) {
     command += ` --user=${shellQuote(user)}`;
@@ -114,7 +114,9 @@ export async function getJobHistory(sshClient, options = {}) {
 
   const jobs = lines.map((line) => {
     const parts = line.split(/\s+/);
-    const cpuSeconds = parseInt(parts[6], 10);
+    const rawDatetime = parts[5] || '';
+    const datetime = (rawDatetime === 'Unknown' || rawDatetime === 'None') ? '' : rawDatetime;
+    const cpuSeconds = parseInt(parts[7], 10);
     const cpuHours = (cpuSeconds / 3600).toFixed(2);
 
     return {
@@ -123,9 +125,10 @@ export async function getJobHistory(sshClient, options = {}) {
       user: parts[2],
       account: parts[3],
       state: parts[4],
-      elapsed: parts[5],
+      datetime,
+      elapsed: parts[6],
       cpuHours,
-      maxMemory: parts[7],
+      maxMemory: parts[8],
     };
   });
 
@@ -161,7 +164,7 @@ export const allocationInfoTool = {
 export const jobHistoryTool = {
   name: 'get_job_history',
   description:
-    'Get historical job accounting and compute hour usage for auditing resource consumption and budgeting. Works for any user on the system—filter by username to examine any user\'s job history. Returns per-job details: job ID, name, user, account, final status (COMPLETED/FAILED/TIMEOUT), time elapsed, CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs in the time window for budget tracking. Use this to: (1) understand how many compute hours jobs consumed historically, (2) estimate resource needs for similar future jobs, (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify inefficient jobs (short time but high CPU/memory usage indicates poor parallelization), (5) prepare reports on resource usage, (6) audit another user\'s cluster activity. Supports lookback from 1-365+ days; default is 30 days of recent history. Combine with get_allocation_info to understand budget remaining.',
+    'Get historical job accounting and compute hour usage for auditing resource consumption and budgeting. Works for any user on the system—filter by username to examine any user\'s job history. Returns per-job details: job ID, name, user, account, final status (COMPLETED/FAILED/TIMEOUT), datetime (job start time), time elapsed, CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs in the time window for budget tracking. Use this to: (1) understand how many compute hours jobs consumed historically, (2) estimate resource needs for similar future jobs, (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify inefficient jobs (short time but high CPU/memory usage indicates poor parallelization), (5) prepare reports on resource usage, (6) audit another user\'s cluster activity. Supports lookback from 1-365+ days; default is 30 days of recent history. Combine with get_allocation_info to understand budget remaining.',
   inputSchema: {
     type: 'object',
     properties: {

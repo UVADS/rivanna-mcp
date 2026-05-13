@@ -1,9 +1,7 @@
 import { shellQuote } from '../utils.js';
 
-export async function getStorageQuota(sshClient) {
-  // Get current username
-  const usernameOutput = await sshClient.exec('whoami');
-  const username = usernameOutput.trim();
+export async function getStorageQuota(sshClient, config = {}) {
+  const username = config.computingId || (await sshClient.exec('whoami')).trim();
 
   // Get quota info from hdquota -s
   let hdquotaOutput;

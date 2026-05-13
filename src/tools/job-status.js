@@ -14,8 +14,8 @@ function parseElapsedHours(elapsed) {
   return days * 24 + hours + minutes / 60 + seconds / 3600;
 }
 
-export async function listJobs(sshClient, options = {}) {
-  const { state = 'all', user, limit = 100 } = options;
+export async function listJobs(sshClient, options = {}, config = {}) {
+  const { state = 'all', user = config.computingId, limit = 100 } = options;
 
   // %i=job_id %j=name %S=start_time %T=state %M=elapsed %C=cpus
   let command = `squeue --format='%i|%j|%S|%T|%M|%C'`;
@@ -74,7 +74,7 @@ export const listJobsTool = {
       },
       user: {
         type: 'string',
-        description: 'Filter to show only jobs belonging to a specific username (e.g., "mst3k"). Useful for monitoring your own jobs or troubleshooting a specific user\'s activity. Omit to see all jobs across the entire cluster.',
+        description: 'Filter to show only jobs belonging to a specific username (e.g., "mst3k"). Omit to show your own jobs (defaults to the computingId from config). Pass a different username to monitor another user\'s activity or see all cluster jobs.',
       },
       limit: {
         type: 'number',
