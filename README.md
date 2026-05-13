@@ -81,18 +81,18 @@ IDEs or agents.
 
 The twelve tools in the Rivanna MCP are:
 
-1. **`get_cluster_overview`** — Returns a comprehensive snapshot of the entire Rivanna cluster, including capacity, GPU availability, node status, and 24-hour trends.
-2. **`get_cluster_usage_24h`** — Shows CPU and memory utilization trends for the past 24 hours rendered as colored ASCII graphics.
-3. **`get_node_resources`** — Lists available compute nodes and their current resource status, optionally filtered by partition.
-4. **`get_storage_quota`** — Reports filesystem quota usage across all mounted filesystems, with optional filtering by path.
-5. **`get_directory_usage`** — Returns disk usage for a specific directory on the cluster.
-6. **`get_allocation_info`** — Displays compute-hour allocation limits for a user or account.
-7. **`get_job_history`** — Retrieves historical job accounting and compute-hour consumption over a configurable number of past days.
-8. **`submit_job`** — Creates and optionally submits a SLURM job script to Rivanna with configurable resources, module loading, and file transfer.
-9. **`list_jobs`** — Queries the SLURM job queue and returns jobs filtered by state, user, or count limit.
-10. **`cancel_job`** — Cancels a running or pending SLURM job by ID, with optional signal selection.
-11. **`ssh_login`** — Opens an interactive SSH session to Rivanna's login node using your configured credentials.
-12. **`exec_command`** — Runs an arbitrary shell command on Rivanna and returns its output directly to your IDE.
+1. **Cluster Overview** — Returns a comprehensive snapshot of the entire Rivanna cluster, including capacity, GPU availability, node status, and 24-hour trends.
+2. **Cluster Usage (24h)** — Shows CPU and memory utilization trends for the past 24 hours rendered as colored ASCII graphics.
+3. **Node Resources** — Lists available compute nodes and their current resource status, optionally filtered by partition.
+4. **Storage Quota** — Reports filesystem quota usage across all mounted filesystems, with optional filtering by path.
+5. **Directory Usage** — Returns disk usage for a specific directory on the cluster.
+6. **Allocation Info** — Displays compute-hour allocation limits for a user or account.
+7. **Job History** — Retrieves historical job accounting and compute-hour consumption over a configurable number of past days.
+8. **Submit Job** — Creates and optionally submits a SLURM job script to Rivanna with configurable resources, module loading, and file transfer.
+9. **List Jobs** — Queries the SLURM job queue and returns jobs filtered by state, user, or count limit.
+10. **Cancel Job** — Cancels a running or pending SLURM job by ID, with optional signal selection.
+11. **SSH Login** — Opens an interactive SSH session to Rivanna's login node using your configured credentials.
+12. **Execute Command** — Runs an arbitrary shell command on Rivanna and returns its output directly to your IDE.
 
 You can read more detail about each tool below.
 
