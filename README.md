@@ -635,7 +635,7 @@ At submission time, values are resolved in this order (highest wins):
 
 **Julia** — loads a Julia module; runs `Pkg.instantiate()` if `Project.toml` exists.
 
-**Rust** — installs via `rustup` (no Rivanna module yet); builds with `cargo build --release`.
+**Rust** — no `cargo` or `rust` module available on Rivanna; bootstraps the toolchain at job runtime via `rustup`, then builds with `cargo build --release`.
 
 **MATLAB** — loads `matlab`; runs the detected script with `matlab -nodisplay -nosplash`.
 
