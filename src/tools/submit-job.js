@@ -40,6 +40,10 @@ async function detectProject(dir) {
   const rustFiles    = find(['.rs']);
   const matlabFiles  = find(['.m']);
   const fortranFiles = find(['.f', '.f90', '.f95', '.f03', '.f08', '.F', '.F90', '.for', '.ftn']);
+  const javaFiles    = find(['.java']);
+  const nextflowFiles= find(['.nf']);
+  const snakemakeFiles = entries.filter(f => f === 'Snakefile' || f.endsWith('.smk'));
+  const perlFiles    = find(['.pl', '.pm']);
 
   return {
     python: {
@@ -88,6 +92,28 @@ async function detectProject(dir) {
       // MPI hint: file named with 'mpi' or presence of common MPI driver files
       hasMpi:       fortranFiles.some(f => /mpi/i.test(f)) || exact(['mpif.h']),
     },
+    java: {
+      detected: javaFiles.length > 0,
+      scripts: javaFiles,
+      hasMaven:  exact(['pom.xml']),
+      hasGradle: entries.some(f => f === 'build.gradle' || f === 'build.gradle.kts'),
+      hasJar:    entries.some(f => f.endsWith('.jar')),
+    },
+    nextflow: {
+      detected: nextflowFiles.length > 0 || exact(['nextflow.config']),
+      scripts: nextflowFiles,
+      hasConfig: exact(['nextflow.config']),
+      hasMain:   exact(['main.nf']),
+    },
+    snakemake: {
+      detected: snakemakeFiles.length > 0,
+      scripts: snakemakeFiles,
+      hasConfig: entries.some(f => f === 'config.yaml' || f === 'config.yml' || f === 'config.json'),
+    },
+    perl: {
+      detected: perlFiles.length > 0,
+      scripts: perlFiles,
+    },
   };
 }
 
@@ -95,14 +121,18 @@ async function detectProject(dir) {
 function generateYamlTemplate(proj, dirName) {
   // Determine the dominant language (first match wins; multi-language projects are rare)
   const dominant =
-    proj.python.detected  ? 'python'  :
-    proj.r.detected       ? 'r'       :
-    proj.go.detected      ? 'go'      :
-    proj.fortran.detected ? 'fortran' :
-    proj.c.detected       ? 'c'       :
-    proj.julia.detected   ? 'julia'   :
-    proj.rust.detected    ? 'rust'    :
-    proj.matlab.detected  ? 'matlab'  :
+    proj.nextflow.detected  ? 'nextflow'  :
+    proj.snakemake.detected ? 'snakemake' :
+    proj.python.detected    ? 'python'    :
+    proj.r.detected         ? 'r'         :
+    proj.go.detected        ? 'go'        :
+    proj.fortran.detected   ? 'fortran'   :
+    proj.c.detected         ? 'c'         :
+    proj.julia.detected     ? 'julia'     :
+    proj.rust.detected      ? 'rust'      :
+    proj.matlab.detected    ? 'matlab'    :
+    proj.java.detected      ? 'java'      :
+    proj.perl.detected      ? 'perl'      :
     null;
 
   const jobName = dirName || 'my-job';
@@ -359,6 +389,125 @@ ${runLine}
 
     filesSection = `files:\n${proj.matlab.scripts.slice(0, 5).map(f => `  - ./${f}`).join('\n')}`;
 
+  // ── Java ─────────────────────────────────────────────────────────────────
+  } else if (dominant === 'java') {
+    detectionNote = `# Detected: Java project (${proj.java.scripts.length} .java file(s) found)\n`;
+
+    modulesSection = `modules:
+  - java/11.0.2            # or: java/17 — check versions with module spider java
+  # Many bioinformatics tools (GATK, Picard, Trimmomatic) ship as pre-built JARs
+  # and only need a JRE, not a full JDK. Confirm with: java -version`;
+
+    if (proj.java.hasJar) {
+      const jarFile = entries.find(f => f.endsWith('.jar')) || 'app.jar';
+      envSection = `env_setup:
+  # Pre-built JAR detected — no compile step needed`;
+      commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - java -Xmx$((${`$`}{SLURM_MEM_PER_NODE}*9/10))M -jar ${jarFile}
+  # Common bioinformatics examples:
+  # - java -Xmx16g -jar gatk.jar HaplotypeCaller -R ref.fa -I input.bam -O output.vcf
+  # - java -jar picard.jar SortSam I=input.bam O=sorted.bam SORT_ORDER=coordinate`;
+      filesSection = `files:\n  - ./${jarFile}`;
+    } else if (proj.java.hasMaven) {
+      envSection = `env_setup:
+  - mvn -q package -DskipTests   # build fat JAR via Maven`;
+      commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - java -Xmx${`$`}{SLURM_MEM_PER_NODE}M -jar target/*.jar`;
+      const fileList = proj.java.scripts.slice(0, 6).map(f => `  - ./${f}`).join('\n');
+      filesSection = `files:\n${fileList}\n  - ./pom.xml`;
+    } else if (proj.java.hasGradle) {
+      envSection = `env_setup:
+  - ./gradlew build -x test      # build via Gradle wrapper`;
+      commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - java -Xmx${`$`}{SLURM_MEM_PER_NODE}M -jar build/libs/*.jar`;
+      const fileList = proj.java.scripts.slice(0, 6).map(f => `  - ./${f}`).join('\n');
+      filesSection = `files:\n${fileList}\n  - ./build.gradle`;
+    } else {
+      const mainFile = proj.java.scripts.find(f => /Main|App|Runner/i.test(f)) || proj.java.scripts[0];
+      const className = mainFile ? mainFile.replace('.java', '') : 'Main';
+      envSection = `env_setup:
+  - javac *.java                 # compile all Java source files`;
+      commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - java -Xmx${`$`}{SLURM_MEM_PER_NODE}M ${className}`;
+      filesSection = `files:\n${proj.java.scripts.slice(0, 6).map(f => `  - ./${f}`).join('\n')}`;
+    }
+
+  // ── Nextflow ──────────────────────────────────────────────────────────────
+  } else if (dominant === 'nextflow') {
+    const mainScript = proj.nextflow.hasMain ? 'main.nf' : (proj.nextflow.scripts[0] || 'main.nf');
+    detectionNote = `# Detected: Nextflow workflow (${proj.nextflow.scripts.length} .nf file(s) found)\n`;
+
+    modulesSection = `modules:
+  - nextflow                 # Nextflow workflow engine
+  - singularity              # recommended: Nextflow pulls containers via Singularity on HPC
+  # - miniforge              # alternative: use conda envs per process instead of containers`;
+
+    envSection = `env_setup:
+  - export NXF_SINGULARITY_CACHEDIR=/scratch/$USER/singularity-cache
+  - mkdir -p $NXF_SINGULARITY_CACHEDIR
+  # Nextflow manages its own parallelism — set CPUs/memory generously for the head job
+  # Individual processes get their own resource allocations defined in the pipeline`;
+
+    commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - nextflow run ${mainScript} -profile slurm${proj.nextflow.hasConfig ? '' : ' \\'}
+  # nextflow run ${mainScript} -profile slurm --outdir ./results
+  # nextflow run ${mainScript} -resume              # re-use cached results from prior run
+  # nextflow run ${mainScript} -with-report report.html -with-timeline timeline.html`;
+
+    const fileList = proj.nextflow.scripts.map(f => `  - ./${f}`).join('\n');
+    filesSection = `files:\n${fileList}${proj.nextflow.hasConfig ? '\n  - ./nextflow.config' : ''}`;
+
+  // ── Snakemake ─────────────────────────────────────────────────────────────
+  } else if (dominant === 'snakemake') {
+    const snakefile = proj.snakemake.scripts.find(f => f === 'Snakefile') || proj.snakemake.scripts[0];
+    detectionNote = `# Detected: Snakemake workflow (${proj.snakemake.scripts.length} Snakefile/smk file(s) found)\n`;
+
+    modulesSection = `modules:
+  - miniforge                # Snakemake is installed via conda/mamba
+  # Snakemake manages per-rule environments — the head job just needs the engine`;
+
+    envSection = `env_setup:
+  - pip install snakemake    # or: conda install -c bioconda snakemake
+  # - pip install snakemake-executor-plugin-slurm   # if submitting sub-jobs to SLURM`;
+
+    commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - snakemake --cores $SLURM_CPUS_PER_TASK --snakefile ${snakefile}
+  # - snakemake --cores $SLURM_CPUS_PER_TASK --use-conda   # activate per-rule conda envs
+  # - snakemake --cores $SLURM_CPUS_PER_TASK --use-singularity
+  # - snakemake --executor slurm --jobs 50            # submit each rule as its own SLURM job`;
+
+    const fileList = proj.snakemake.scripts.map(f => `  - ./${f}`).join('\n');
+    const configFile = proj.snakemake.hasConfig
+      ? '\n  - ./config.yaml' : '';
+    filesSection = `files:\n${fileList}${configFile}`;
+
+  // ── Perl ──────────────────────────────────────────────────────────────────
+  } else if (dominant === 'perl') {
+    const mainScript = proj.perl.scripts.find(f => /main|run|pipeline|script/i.test(f))
+      || proj.perl.scripts[0];
+    detectionNote = `# Detected: Perl project (${proj.perl.scripts.length} .pl/.pm file(s) found)\n`;
+
+    modulesSection = `modules:
+  - perl                     # check versions: module spider perl
+  # - bioperl                # uncomment for BioPerl (bioinformatics) workflows`;
+
+    envSection = `env_setup:
+  # - cpanm --installdeps .  # install deps from cpanfile if present
+  # - export PERL5LIB=$PWD/lib:$PERL5LIB   # add local lib dir to Perl path`;
+
+    commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - perl ${mainScript || 'your_script.pl'}
+  # - perl ${mainScript || 'your_script.pl'} --input data.fa --output results/`;
+
+    filesSection = `files:\n${proj.perl.scripts.slice(0, 6).map(f => `  - ./${f}`).join('\n')}`;
+
   // ── Unknown / generic ────────────────────────────────────────────────────
   } else {
     detectionNote = `# No dominant language detected — generic template generated.\n# Uncomment the modules and commands that match your project.\n`;
@@ -372,6 +521,9 @@ ${runLine}
   # - gcc/11.4.0           # C/C++/Fortran (gfortran included)
   # - intel/2023.1         # Intel compilers (ifort, icpc, icc)
   # - openmpi/4.1.4        # MPI
+  # - java/11.0.2          # Java / JVM-based tools
+  # - nextflow             # Nextflow workflow engine
+  # - perl                 # Perl
   # - go/1.21.0
   # - julia/1.9.0
   # - cuda/11.8.0`;
@@ -446,7 +598,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     const dirName = basename(cwd).replace(/[^a-z0-9-]/gi, '').toLowerCase();
     const template = generateYamlTemplate(proj, dirName);
     await fs.writeFile(yamlPath, template, 'utf-8');
-    const detected = ['python','r','go','fortran','c','julia','rust','matlab'].find(l => proj[l]?.detected) || 'unknown';
+    const detected = ['nextflow','snakemake','python','r','go','fortran','c','julia','rust','matlab','java','perl'].find(l => proj[l]?.detected) || 'unknown';
     return {
       success: false,
       yamlCreated: true,

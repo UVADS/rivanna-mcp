@@ -559,6 +559,8 @@ Search Rivanna's LMOD software stack for available modules and their versions us
 If no `rivanna.yaml` exists when you call `submit_job`, the tool automatically:
 
 1. **Scans your project directory** for language-specific files to detect the dominant language:
+   - Nextflow: `*.nf`, `nextflow.config`
+   - Snakemake: `Snakefile`, `*.smk`
    - Python: `*.py`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `environment.yml`
    - R: `*.R`, `*.Rmd`, `renv.lock`, `DESCRIPTION`
    - Go: `*.go`, `go.mod`
@@ -567,6 +569,8 @@ If no `rivanna.yaml` exists when you call `submit_job`, the tool automatically:
    - Julia: `*.jl`, `Project.toml`
    - Rust: `*.rs`, `Cargo.toml`
    - MATLAB: `*.m`
+   - Java: `*.java`, `pom.xml`, `build.gradle`, `*.jar`
+   - Perl: `*.pl`, `*.pm`
 2. **Generates a tailored template** with the right modules, env setup commands, and file list pre-filled for that language
 3. **Stops and asks you to review** — set your `account`, confirm modules and commands, then call `submit_job` again
 
@@ -638,6 +642,14 @@ At submission time, values are resolved in this order (highest wins):
 **Rust** — no `cargo` or `rust` module available on Rivanna; bootstraps the toolchain at job runtime via `rustup`, then builds with `cargo build --release`.
 
 **MATLAB** — loads `matlab`; runs the detected script with `matlab -nodisplay -nosplash`.
+
+**Java** — loads `java/11.0.2`; detects pre-built JARs, Maven (`pom.xml`), or Gradle (`build.gradle`) and generates the appropriate compile/run commands. Sets `-Xmx` heap size from `$SLURM_MEM_PER_NODE` automatically. Includes commented examples for common bioinformatics tools (GATK, Picard).
+
+**Nextflow** — loads `nextflow` + `singularity`; generates a `nextflow run` command with `-profile slurm` and sets `NXF_SINGULARITY_CACHEDIR` to scratch. Includes `-resume` and reporting flags as commented options.
+
+**Snakemake** — loads `miniforge` and installs Snakemake; runs with `--cores $SLURM_CPUS_PER_TASK`. Includes commented options for `--use-conda`, `--use-singularity`, and SLURM executor plugin for per-rule job submission.
+
+**Perl** — loads `perl`; includes commented BioPerl module and `cpanm` dependency install. Generates a `perl script.pl` run command from the detected main script.
 
 ## Troubleshooting
 
