@@ -562,6 +562,7 @@ If no `rivanna.yaml` exists when you call `submit_job`, the tool automatically:
    - Python: `*.py`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `environment.yml`
    - R: `*.R`, `*.Rmd`, `renv.lock`, `DESCRIPTION`
    - Go: `*.go`, `go.mod`
+   - Fortran: `*.f`, `*.f90`, `*.f95`, `*.f03`, `*.F90`, `*.for`, `*.ftn`, `mpif.h`
    - C/C++: `*.c`, `*.cpp`, `Makefile`, `CMakeLists.txt`
    - Julia: `*.jl`, `Project.toml`
    - Rust: `*.rs`, `Cargo.toml`
@@ -627,6 +628,8 @@ At submission time, values are resolved in this order (highest wins):
 **R** — loads `goolf` + `R`; runs `renv::restore()` if `renv.lock` exists, or `devtools::install_deps()` if `DESCRIPTION` exists.
 
 **Go** — loads a Go module; runs `go mod download` if `go.mod` is present, then builds with `go build`.
+
+**Fortran** — loads `gcc/11.4.0` (includes `gfortran`); detects MPI usage from filenames (`*mpi*`, `mpif.h`) and adds `openmpi` + `mpirun` if found; builds with `make`, `cmake`, or a direct `gfortran` compile. Supports `.f`, `.f90`, `.f95`, `.f03`, `.F90`, `.for`, and `.ftn` extensions. Intel compiler (`ifort`) is offered as a commented alternative.
 
 **C/C++** — loads `gcc`; builds with `make`, `cmake`, or a direct `gcc` compile depending on project files found.
 

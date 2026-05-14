@@ -32,13 +32,14 @@ async function detectProject(dir) {
   const find = (exts) => entries.filter(f => exts.some(e => f.endsWith(e)));
   const exact = (names) => entries.some(f => names.includes(f));
 
-  const pyFiles   = find(['.py']);
-  const rFiles    = find(['.R', '.r', '.Rmd', '.rmd']);
-  const goFiles   = find(['.go']);
-  const cFiles    = find(['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp']);
-  const juliaFiles= find(['.jl']);
-  const rustFiles = find(['.rs']);
-  const matlabFiles = find(['.m']);
+  const pyFiles      = find(['.py']);
+  const rFiles       = find(['.R', '.r', '.Rmd', '.rmd']);
+  const goFiles      = find(['.go']);
+  const cFiles       = find(['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp']);
+  const juliaFiles   = find(['.jl']);
+  const rustFiles    = find(['.rs']);
+  const matlabFiles  = find(['.m']);
+  const fortranFiles = find(['.f', '.f90', '.f95', '.f03', '.f08', '.F', '.F90', '.for', '.ftn']);
 
   return {
     python: {
@@ -79,6 +80,14 @@ async function detectProject(dir) {
       detected: matlabFiles.length > 0,
       scripts: matlabFiles,
     },
+    fortran: {
+      detected: fortranFiles.length > 0,
+      scripts: fortranFiles,
+      hasMakefile:  exact(['Makefile', 'makefile', 'GNUmakefile']),
+      hasCmake:     exact(['CMakeLists.txt']),
+      // MPI hint: file named with 'mpi' or presence of common MPI driver files
+      hasMpi:       fortranFiles.some(f => /mpi/i.test(f)) || exact(['mpif.h']),
+    },
   };
 }
 
@@ -86,13 +95,14 @@ async function detectProject(dir) {
 function generateYamlTemplate(proj, dirName) {
   // Determine the dominant language (first match wins; multi-language projects are rare)
   const dominant =
-    proj.python.detected ? 'python' :
-    proj.r.detected      ? 'r'      :
-    proj.go.detected     ? 'go'     :
-    proj.c.detected      ? 'c'      :
-    proj.julia.detected  ? 'julia'  :
-    proj.rust.detected   ? 'rust'   :
-    proj.matlab.detected ? 'matlab' :
+    proj.python.detected  ? 'python'  :
+    proj.r.detected       ? 'r'       :
+    proj.go.detected      ? 'go'      :
+    proj.fortran.detected ? 'fortran' :
+    proj.c.detected       ? 'c'       :
+    proj.julia.detected   ? 'julia'   :
+    proj.rust.detected    ? 'rust'    :
+    proj.matlab.detected  ? 'matlab'  :
     null;
 
   const jobName = dirName || 'my-job';
@@ -280,6 +290,56 @@ function generateYamlTemplate(proj, dirName) {
 
     filesSection = `files:\n  - ./Cargo.toml\n  - ./Cargo.lock\n  - ./src/`;
 
+  // ── Fortran ──────────────────────────────────────────────────────────────
+  } else if (dominant === 'fortran') {
+    const hasMpi = proj.fortran.hasMpi;
+    detectionNote = `# Detected: Fortran project (${proj.fortran.scripts.length} source file(s) found)${hasMpi ? ' — MPI usage detected' : ''}\n`;
+
+    modulesSection = `modules:
+  - gcc/11.4.0             # gfortran compiler (included with gcc)
+${hasMpi
+  ? `  - openmpi/4.1.4        # MPI runtime — required for mpirun/mpifort
+  # - intel/2023.1          # alternative: Intel compilers (ifort + Intel MPI)`
+  : `  # - openmpi/4.1.4      # uncomment if your code uses MPI
+  # - intel/2023.1          # alternative: Intel compilers (ifort) — often faster for HPC`}
+  # - hdf5/1.12.2           # uncomment if reading/writing HDF5 files
+  # - netcdf/4.9.0          # uncomment if using NetCDF I/O (climate, ocean, atmo models)`;
+
+    if (proj.fortran.hasMakefile) {
+      envSection = `env_setup:
+  - make clean && make      # build from Makefile (uses gfortran or ifort from loaded modules)
+  # - make FC=ifort         # force Intel Fortran compiler if preferred`;
+    } else if (proj.fortran.hasCmake) {
+      envSection = `env_setup:
+  - mkdir -p build && cd build
+  - cmake .. -DCMAKE_Fortran_COMPILER=gfortran
+  - make -j$SLURM_CPUS_PER_TASK`;
+    } else {
+      const srcFiles = proj.fortran.scripts.filter(f => /\.(f90|f95|f03|f08|F90)$/i.test(f));
+      const mainSrc  = srcFiles.find(f => /main|program/i.test(f)) || srcFiles[0] || proj.fortran.scripts[0];
+      const otherSrc = srcFiles.filter(f => f !== mainSrc).slice(0, 4).join(' ');
+      envSection = `env_setup:
+  - gfortran -O2 -o ./my_program ${otherSrc ? otherSrc + ' ' : ''}${mainSrc}
+  # - gfortran -O3 -fopenmp -o ./my_program ${mainSrc}   # add OpenMP threading
+  # - mpifort  -O2 -o ./my_program ${mainSrc}            # MPI-aware compile`;
+    }
+
+    const runLine = hasMpi
+      ? `  - mpirun -np $SLURM_NTASKS ./my_program        # MPI parallel run\n  # - srun ./my_program                           # alternative: use SLURM's srun`
+      : `  - ./my_program                                  # serial or OpenMP run\n  # - OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK ./my_program  # explicit OpenMP threads`;
+
+    commandsSection = `commands:
+  - echo "Job started on $(hostname) at $(date)"
+${runLine}
+  - echo "Job finished at $(date)"`;
+
+    const fileList = proj.fortran.scripts.slice(0, 8).map(f => `  - ./${f}`).join('\n');
+    const extras = [
+      proj.fortran.hasMakefile ? '  - ./Makefile' : null,
+      proj.fortran.hasCmake   ? '  - ./CMakeLists.txt' : null,
+    ].filter(Boolean).join('\n');
+    filesSection = `files:\n${fileList}${extras ? '\n' + extras : ''}`;
+
   // ── MATLAB ───────────────────────────────────────────────────────────────
   } else if (dominant === 'matlab') {
     detectionNote = `# Detected: MATLAB project (${proj.matlab.scripts.length} .m file(s) found)\n`;
@@ -309,7 +369,8 @@ function generateYamlTemplate(proj, dirName) {
   # - miniforge            # Python (Conda)
   # - goolf                # R toolchain
   # - R
-  # - gcc/11.4.0           # C/C++
+  # - gcc/11.4.0           # C/C++/Fortran (gfortran included)
+  # - intel/2023.1         # Intel compilers (ifort, icpc, icc)
   # - openmpi/4.1.4        # MPI
   # - go/1.21.0
   # - julia/1.9.0
@@ -385,7 +446,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     const dirName = basename(cwd).replace(/[^a-z0-9-]/gi, '').toLowerCase();
     const template = generateYamlTemplate(proj, dirName);
     await fs.writeFile(yamlPath, template, 'utf-8');
-    const detected = ['python','r','go','c','julia','rust','matlab'].find(l => proj[l]?.detected) || 'unknown';
+    const detected = ['python','r','go','fortran','c','julia','rust','matlab'].find(l => proj[l]?.detected) || 'unknown';
     return {
       success: false,
       yamlCreated: true,
