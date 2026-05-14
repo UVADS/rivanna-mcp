@@ -550,82 +550,91 @@ Search Rivanna's LMOD software stack for available modules and their versions us
 - "Find the right module string for OpenMPI"
 - "What R versions can I load?"
 
-## Planned: Project Configuration with `rivanna.yaml`
+## Project Configuration with `rivanna.yaml`
 
-A proposed feature (not yet shipped) that lets each project carry a declarative file describing exactly what environment its SLURM jobs need — modules, language runtime, package installs, environment variables, and pre-/post-job hooks. The submitter consumes this file and produces a reproducible SLURM script, removing guesswork from the submission flow.
+`rivanna.yaml` is the **single source of truth** for every SLURM job submitted from a project. It lives at the project root and declares the full job environment — SLURM resource parameters, modules to load, environment setup commands, the job commands themselves, and which local files to upload. `submit_job` reads this file and produces a reproducible SLURM script; no interview required once the file exists.
 
-### The file: `rivanna.yaml`
+### Auto-generating `rivanna.yaml`
 
-A single YAML file at the project root that declares the full job environment:
+If no `rivanna.yaml` exists when you call `submit_job`, the tool automatically:
+
+1. **Scans your project directory** for language-specific files to detect the dominant language:
+   - Python: `*.py`, `requirements.txt`, `Pipfile`, `pyproject.toml`, `environment.yml`
+   - R: `*.R`, `*.Rmd`, `renv.lock`, `DESCRIPTION`
+   - Go: `*.go`, `go.mod`
+   - C/C++: `*.c`, `*.cpp`, `Makefile`, `CMakeLists.txt`
+   - Julia: `*.jl`, `Project.toml`
+   - Rust: `*.rs`, `Cargo.toml`
+   - MATLAB: `*.m`
+2. **Generates a tailored template** with the right modules, env setup commands, and file list pre-filled for that language
+3. **Stops and asks you to review** — set your `account`, confirm modules and commands, then call `submit_job` again
+
+### The `rivanna.yaml` format
 
 ```yaml
-# rivanna.yaml — environment declaration for SLURM submissions
-version: 1
+# rivanna.yaml — SLURM job specification for this project
 
-slurm:
-  partition: gpu
-  time: "04:00:00"
-  cpus: 8
-  memory: 32G
-  gpus: 1
-  account: my-allocation
+job:
+  name: my-job
+  account: my-allocation      # required — use get_allocation_info to list yours
+  partition: standard         # standard | gpu | parallel | largemem
+  nodes: 1
+  cpus: 4
+  memory: 16GB
+  time: "01:00:00"            # HH:MM:SS — job is killed when this expires
+  # gpus: 1                   # uncomment for GPU jobs; also set partition: gpu
 
 modules:
-  - miniforge
-  - cuda/12.4
+  - miniforge                 # load LMOD modules in this order
+  # - cuda/12.4.0             # use search_modules to find exact version strings
 
-language:
-  kind: python                  # python | r | none
-  version: "3.11"
-  env_manager: venv             # venv | conda | pipenv | none
-  env_name: .venv
-  requirements: requirements.txt
+env_setup:
+  - pip install -r requirements.txt   # runs after module load, before commands
 
-env:
-  WANDB_PROJECT: my-project
-  HF_HOME: /scratch/$USER/huggingface
+commands:
+  - echo "Job started on $(hostname) at $(date)"
+  - python train.py
 
-pre_job:
-  - "mkdir -p /scratch/$USER/huggingface"
-
-post_job:
-  - "echo Finished at $(date)"
-
-entrypoint: "python train.py"
+files:
+  - ./train.py                # local files to upload to the job directory
+  - ./requirements.txt
 ```
 
-### The tool: `create_job_template`
+### Value precedence
 
-A new MCP tool that scans the current project and writes a commented `rivanna.yaml` stub the user can edit before submitting. The user runs it once per project; from then on, `submit_job` reads the file and skips the interview flow.
+At submission time, values are resolved in this order (highest wins):
 
-**What it does:**
-
-1. **Detects language** — looks for `*.py` + `requirements.txt` / `Pipfile`, or `*.R` + `install.R` / `DESCRIPTION`
-2. **Detects intent** — greps imports for `torch` / `tensorflow` / `cupy` and suggests a GPU partition; `mpi4py` suggests a parallel partition
-3. **Reads your SLURM preferences** — pulls `time`, `partition`, `cpus`, `memory`, `nodes`, and `allocation` from `~/.rivanna-mcp/slurm-defaults.json`
-4. **Annotates every default** — each field gets a `# from slurm-defaults.json` or `# detected: ...` comment so you can see at a glance which values came from your preferences versus the tool's guess
-5. **Never overwrites silently** — refuses if `rivanna.yaml` already exists unless `overwrite=true`, and always writes a timestamped `.bak` first
+```
+1. Explicit tool arguments (e.g., partition: "gpu" passed to submit_job)
+2. rivanna.yaml job: section
+3. ~/.rivanna-mcp/slurm-defaults.json  (set via `rivanna-mcp slurm-defaults`)
+4. ~/.rivanna-mcp/config.json          (defaultAllocation only)
+5. Built-in fallbacks                  (partition: standard, cpus: 4, memory: 16GB)
+```
 
 ### Source-of-authority rule
 
-`~/.rivanna-mcp/slurm-defaults.json` is the **single source of authority** for user-wide SLURM defaults. The generator reads it but never writes to it. If you want to change your defaults, update them once via the setup command — the next `create_job_template` run picks them up automatically.
+| File | Role | Written by |
+|------|------|------------|
+| `~/.rivanna-mcp/slurm-defaults.json` | User-wide defaults | `rivanna-mcp slurm-defaults` only |
+| `<project>/rivanna.yaml` | Per-project job spec | Auto-generated + user edits |
+| Generated `.slurm` script | What actually runs on the cluster | `submit_job` |
 
-| File                                       | Role                                              | Written by         |
-|--------------------------------------------|---------------------------------------------------|--------------------|
-| `~/.rivanna-mcp/slurm-defaults.json`       | User-wide defaults (one place to edit)            | Setup command only |
-| `<project>/rivanna.yaml`                   | Per-project environment declaration               | `create_job_template` + user edits |
-| Generated SLURM script                     | What actually runs (consumes `rivanna.yaml`)      | `submit_job`       |
+### Language-specific behavior
 
-### Value precedence at generation time
+**Python** — loads `miniforge`; installs deps via `pip install -r requirements.txt`, `pipenv install`, or `conda env create` depending on what's present.
 
-```
-1. Project detection (e.g., torch import → partition: gpu)   [highest]
-2. ~/.rivanna-mcp/slurm-defaults.json
-3. ~/.rivanna-mcp/config.json (defaultAllocation only)
-4. Built-in fallback (e.g., partition: standard)             [lowest]
-```
+**R** — loads `goolf` + `R`; runs `renv::restore()` if `renv.lock` exists, or `devtools::install_deps()` if `DESCRIPTION` exists.
 
-Detection only outranks preferences when the signal is strong (GPU imports, MPI imports). For ambiguous values like time, memory, and CPUs, your preferences always win — they are a stronger signal than the tool's guess.
+**Go** — loads a Go module; runs `go mod download` if `go.mod` is present, then builds with `go build`.
+
+**C/C++** — loads `gcc`; builds with `make`, `cmake`, or a direct `gcc` compile depending on project files found.
+
+**Julia** — loads a Julia module; runs `Pkg.instantiate()` if `Project.toml` exists.
+
+**Rust** — installs via `rustup` (no Rivanna module yet); builds with `cargo build --release`.
+
+**MATLAB** — loads `matlab`; runs the detected script with `matlab -nodisplay -nosplash`.
 
 ## Troubleshooting
 
