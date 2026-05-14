@@ -121,6 +121,20 @@ class SSHClient {
     });
   }
 
+  // Returns the shell that should be used for login-shell commands (e.g. `module`).
+  // Probes bash first; if .bash_profile does `exec zsh` (common on Rivanna), bash
+  // swallows all output — in that case we fall back to zsh.
+  async getLoginShell() {
+    if (this._loginShell) return this._loginShell;
+    try {
+      const out = await this.exec('/bin/bash -l -c "echo __probe__"');
+      this._loginShell = out.includes('__probe__') ? '/bin/bash' : '/bin/zsh';
+    } catch {
+      this._loginShell = '/bin/zsh';
+    }
+    return this._loginShell;
+  }
+
   async transferFile(localPath, remotePath, timeout = 60000) {
     const localSize = statSync(localPath).size;
     const localFileName = localPath.split('/').pop();

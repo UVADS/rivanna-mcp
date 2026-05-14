@@ -1,4 +1,5 @@
 import { expandNodeRanges, parseLineDelimited, shellQuote } from '../utils.js';
+import { getToolDef } from './loader.js';
 
 export async function getNodeResources(sshClient, options = {}) {
   const { partition, detailed = false } = options;
@@ -76,24 +77,4 @@ export async function getNodeResources(sshClient, options = {}) {
   };
 }
 
-export const nodeResourcesTool = {
-  name: 'get_node_resources',
-  description:
-    'Get detailed inventory of compute nodes on Rivanna including their state, CPU count, memory, and feature tags. Returns per-node information: node name (compute-0-0, gpu-0-1, etc.), current state (idle, allocated, down, drained), CPU cores available, memory capacity, and hardware features (GPU types, processor generation, interconnect type). Use this to: (1) identify available resources before submitting jobs with submit_job, (2) determine which nodes have GPUs or specific hardware features, (3) understand why jobs are stuck (check if matching nodes are down/drained), (4) plan job parameters (CPU count, memory) based on node specifications, (5) diagnose performance issues by checking node state and features. Supports filtering by partition (standard/parallel/gpu/largemem) to narrow down results. Optional detailed mode includes scontrol verification and state summaries for cluster-wide insights.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      partition: {
-        type: 'string',
-        description:
-          'Filter nodes to a specific SLURM partition: "standard" for CPU-only jobs, "gpu" for GPU jobs, "parallel" for large multi-node jobs, "largemem" for high-memory jobs, etc. Omit to see nodes from all partitions.',
-      },
-      detailed: {
-        type: 'boolean',
-        description:
-          'Include detailed cluster-wide summary with node count verification and state breakdown across all partitions. Adds scontrol verification output and partition state summary to results.',
-        default: false,
-      },
-    },
-  },
-};
+export const nodeResourcesTool = getToolDef('get_node_resources');

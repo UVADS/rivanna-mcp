@@ -27,6 +27,9 @@ import { submitJob, submitJobTool } from './submit-job.js';
 import { cancelJob, cancelJobTool } from './cancel-job.js';
 import { execCommand, execCommandTool } from './exec-command.js';
 import { sshLogin, sshLoginTool } from './ssh-login.js';
+import { getJobDetails, getJobDetailsTool } from './job-details.js';
+import { getJobEfficiency, getJobEfficiencyTool } from './job-efficiency.js';
+import { searchModules, searchModulesTool } from './search-modules.js';
 
 const toolDefinitions = [
   [listJobsTool, (client, args, config) => listJobs(client, args, config)],
@@ -41,6 +44,9 @@ const toolDefinitions = [
   [cancelJobTool, (client, args) => cancelJob(client, args)],
   [execCommandTool, (client, args) => execCommand(client, args)],
   [sshLoginTool, () => sshLogin()],
+  [getJobDetailsTool, (client, args) => getJobDetails(client, args)],
+  [getJobEfficiencyTool, (client, args) => getJobEfficiency(client, args)],
+  [searchModulesTool, (client, args) => searchModules(client, args)],
 ];
 
 // Validate tool definitions at import time

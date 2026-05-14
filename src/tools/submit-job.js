@@ -3,6 +3,7 @@ import { basename, resolve } from 'path';
 import { promises as fs } from 'fs';
 import { load as parseYaml } from 'js-yaml';
 import { loadSlurmDefaults } from '../commands/slurm-defaults.js';
+import { getToolDef } from './loader.js';
 
 const RIVANNA_YAML = 'rivanna.yaml';
 
@@ -537,94 +538,4 @@ export async function submitJob(sshClient, options = {}, config = {}) {
   return result;
 }
 
-export const submitJobTool = {
-  name: 'submit_job',
-  description:
-    'THIS IS THE ONLY CORRECT WAY TO SUBMIT SLURM JOBS ON RIVANNA. ' +
-    'Do not use exec_command, sbatch directly, or any other tool for job submission — always use this tool. ' +
-    'Creates and submits a SLURM job using a rivanna.yaml file as the job specification. ' +
-    'rivanna.yaml defines everything: SLURM resource parameters (account, partition, CPUs, memory, time, GPUs), ' +
-    'which modules to load (any language — Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI, etc.), ' +
-    'environment setup commands (activate venvs, pip install, export vars), ' +
-    'the actual job commands, and which local files to upload. ' +
-    'If no rivanna.yaml exists in the current directory, this tool generates a commented template and stops — ' +
-    'work with the user to fill it in, then call submit_job again. ' +
-    'Any tool argument overrides the corresponding rivanna.yaml field for one-off adjustments. ' +
-    'Creates an isolated job directory (~/rivanna-jobs/jobname_timestamp/) on the cluster, ' +
-    'transfers listed files, writes the .slurm script, and submits with sbatch. ' +
-    'Pair with list_jobs to monitor and cancel_job to stop jobs.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      yamlPath: {
-        type: 'string',
-        description:
-          'Path to the rivanna.yaml spec file (optional). Defaults to rivanna.yaml in the current working directory. Override to point at a different spec file.',
-      },
-      jobName: {
-        type: 'string',
-        description:
-          'Override the job name from rivanna.yaml. Displayed in queue and used for output file naming.',
-      },
-      allocation: {
-        type: 'string',
-        description:
-          'Override the allocation/account from rivanna.yaml. Use get_allocation_info to list available accounts.',
-      },
-      partition: {
-        type: 'string',
-        description:
-          'Override the partition from rivanna.yaml (standard | gpu | parallel | largemem).',
-      },
-      cpus: {
-        type: 'integer',
-        description: 'Override CPUs-per-task from rivanna.yaml.',
-        minimum: 1,
-      },
-      memory: {
-        type: 'string',
-        description: 'Override memory from rivanna.yaml (e.g., "32GB").',
-      },
-      time: {
-        type: 'string',
-        description: 'Override wall-clock time from rivanna.yaml (HH:MM:SS).',
-      },
-      nodes: {
-        type: 'integer',
-        description: 'Override node count from rivanna.yaml.',
-        minimum: 1,
-      },
-      gpus: {
-        type: 'string',
-        description:
-          'Override GPUs-per-node from rivanna.yaml (e.g., "1"). Requires partition: gpu.',
-      },
-      outputPath: {
-        type: 'string',
-        description: 'Override stdout path from rivanna.yaml. Use %j for job ID.',
-      },
-      errorPath: {
-        type: 'string',
-        description: 'Override stderr path from rivanna.yaml.',
-      },
-      scriptContent: {
-        type: 'string',
-        description:
-          'Override the commands section from rivanna.yaml entirely. Useful for one-off inline scripts without editing the YAML.',
-      },
-      filesToTransfer: {
-        type: 'array',
-        description:
-          'Additional local files to upload beyond those listed in rivanna.yaml files:.',
-        items: { type: 'string' },
-      },
-      submit: {
-        type: 'boolean',
-        description:
-          'Whether to submit immediately (default: true). Set false to write the script and inspect it before submitting.',
-        default: true,
-      },
-    },
-    required: [],
-  },
-};
+export const submitJobTool = getToolDef('submit_job');

@@ -1,4 +1,5 @@
 import { parseLineDelimited, shellQuote } from '../utils.js';
+import { getToolDef } from './loader.js';
 
 export async function getAllocationInfo(sshClient, options = {}, config = {}) {
   const { user = config.computingId } = options;
@@ -146,37 +147,5 @@ export async function getJobHistory(sshClient, options = {}, config = {}) {
   };
 }
 
-export const allocationInfoTool = {
-  name: 'get_allocation_info',
-  description:
-    'Get your account/allocation details including resource limits and SU (Service Unit) balance information. Returns: cluster name, assigned account(s), user association, max CPUs per job, max nodes per job, max wall-clock time allowed, and group CPU-minutes allocation. Also includes SU balance (how many compute credits remain), reserved SU (amount held for pending jobs), and effective balance. Use this to: (1) verify you have an active allocation before submitting jobs, (2) check if you have sufficient SU balance for planned jobs, (3) understand resource limits (CPU/node/time caps), (4) identify which account to use if you have multiple allocations, (5) track when allocations will expire. Essential for job planning: if SU balance is low or CPU limits are tight, jobs may not schedule even if cluster has free resources.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      user: {
-        type: 'string',
-        description: 'Filter to show allocation info for a specific username (optional). Omit to show your own allocations.',
-      },
-    },
-  },
-};
-
-export const jobHistoryTool = {
-  name: 'get_job_history',
-  description:
-    'Get historical job accounting and compute hour usage for auditing resource consumption and budgeting. Works for any user on the system—filter by username to examine any user\'s job history. Returns per-job details: job ID, name, user, account, final status (COMPLETED/FAILED/TIMEOUT), datetime (job start time), time elapsed, CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs in the time window for budget tracking. Use this to: (1) understand how many compute hours jobs consumed historically, (2) estimate resource needs for similar future jobs, (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify inefficient jobs (short time but high CPU/memory usage indicates poor parallelization), (5) prepare reports on resource usage, (6) audit another user\'s cluster activity. Supports lookback from 1-365+ days; default is 30 days of recent history. Combine with get_allocation_info to understand budget remaining.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      user: {
-        type: 'string',
-        description: 'Show job history for a specific username (e.g., "mst3k"). Use this to audit any user\'s cluster activity. Omit to show your own job history.',
-      },
-      days: {
-        type: 'number',
-        description: 'Number of days of history to retrieve (default: 30). Use larger values (60, 90, 365) for historical trend analysis.',
-        default: 30,
-      },
-    },
-  },
-};
+export const allocationInfoTool = getToolDef('get_allocation_info');
+export const jobHistoryTool = getToolDef('get_job_history');

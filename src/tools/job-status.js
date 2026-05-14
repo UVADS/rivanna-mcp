@@ -1,4 +1,5 @@
 import { parseLineDelimited, shellQuote } from '../utils.js';
+import { getToolDef } from './loader.js';
 
 function parseElapsedHours(elapsed) {
   if (!elapsed || elapsed === '0:00') return 0;
@@ -59,28 +60,4 @@ export async function listJobs(sshClient, options = {}, config = {}) {
   };
 }
 
-export const listJobsTool = {
-  name: 'list_jobs',
-  description:
-    'Query the SLURM job queue to monitor and track jobs on the Rivanna HPC cluster. Returns per-job columns: job_id, name, datetime (start time when running; blank when pending), state, elapsed time, and cpu_hours (elapsed × CPUs). Use this tool to: (1) monitor long-running computations and check progress, (2) verify jobs submitted via submit_job actually started, (3) check queue backlog and estimate when pending jobs will run, (4) identify stuck or failed jobs, (5) track CPU-hour consumption, (6) find job_id values needed by cancel_job. Supports filtering by state, user, and result limit.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      state: {
-        type: 'string',
-        description:
-          'Filter jobs by execution state. "all" (default) returns all jobs; "RUNNING" shows actively executing jobs; "PENDING" shows queued jobs waiting for resources; "COMPLETED" shows finished jobs; "FAILED" shows jobs that exited with error status; "CANCELLED" shows manually terminated jobs. Filtering by state is significantly faster on loaded clusters.',
-        default: 'all',
-      },
-      user: {
-        type: 'string',
-        description: 'Filter to show only jobs belonging to a specific username (e.g., "mst3k"). Omit to show your own jobs (defaults to the computingId from config). Pass a different username to monitor another user\'s activity or see all cluster jobs.',
-      },
-      limit: {
-        type: 'number',
-        description: 'Limit the number of job records returned (default 100). Increase when managing many simultaneous jobs, decrease for faster queries when only monitoring a few jobs.',
-        default: 100,
-      },
-    },
-  },
-};
+export const listJobsTool = getToolDef('list_jobs');

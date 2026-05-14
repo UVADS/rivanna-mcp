@@ -1,0 +1,424 @@
+tools:
+  - name: list_jobs
+    description: >-
+      Query the SLURM job queue to monitor and track jobs on the Rivanna HPC cluster.
+      Returns per-job columns: job_id, name, datetime (start time when running; blank when
+      pending), state, elapsed time, and cpu_hours (elapsed × CPUs). Use this tool to:
+      (1) monitor long-running computations and check progress, (2) verify jobs submitted
+      via submit_job actually started, (3) check queue backlog and estimate when pending
+      jobs will run, (4) identify stuck or failed jobs, (5) track CPU-hour consumption,
+      (6) find job_id values needed by cancel_job. Supports filtering by state, user,
+      and result limit.
+    inputSchema:
+      type: object
+      properties:
+        state:
+          type: string
+          description: >-
+            Filter jobs by execution state. "all" (default) returns all jobs; "RUNNING"
+            shows actively executing jobs; "PENDING" shows queued jobs waiting for
+            resources; "COMPLETED" shows finished jobs; "FAILED" shows jobs that exited
+            with error status; "CANCELLED" shows manually terminated jobs. Filtering by
+            state is significantly faster on loaded clusters.
+          default: all
+        user:
+          type: string
+          description: >-
+            Filter to show only jobs belonging to a specific username (e.g., "mst3k").
+            Omit to show your own jobs (defaults to the computingId from config). Pass a
+            different username to monitor another user's activity or see all cluster jobs.
+        limit:
+          type: number
+          description: >-
+            Limit the number of job records returned (default 100). Increase when managing
+            many simultaneous jobs, decrease for faster queries when only monitoring a
+            few jobs.
+          default: 100
+
+  - name: get_node_resources
+    description: >-
+      Get detailed inventory of compute nodes on Rivanna including their state, CPU count,
+      memory, and feature tags. Returns per-node information: node name (compute-0-0,
+      gpu-0-1, etc.), current state (idle, allocated, down, drained), CPU cores available,
+      memory capacity, and hardware features (GPU types, processor generation, interconnect
+      type). Use this to: (1) identify available resources before submitting jobs with
+      submit_job, (2) determine which nodes have GPUs or specific hardware features,
+      (3) understand why jobs are stuck (check if matching nodes are down/drained),
+      (4) plan job parameters (CPU count, memory) based on node specifications, (5) diagnose
+      performance issues by checking node state and features. Supports filtering by
+      partition (standard/parallel/gpu/largemem) to narrow down results. Optional detailed
+      mode includes scontrol verification and state summaries for cluster-wide insights.
+    inputSchema:
+      type: object
+      properties:
+        partition:
+          type: string
+          description: >-
+            Filter nodes to a specific SLURM partition: "standard" for CPU-only jobs,
+            "gpu" for GPU jobs, "parallel" for large multi-node jobs, "largemem" for
+            high-memory jobs, etc. Omit to see nodes from all partitions.
+        detailed:
+          type: boolean
+          description: >-
+            Include detailed cluster-wide summary with node count verification and state
+            breakdown across all partitions. Adds scontrol verification output and
+            partition state summary to results.
+          default: false
+
+  - name: get_storage_quota
+    description: >-
+      Check storage quota and usage limits for all your accessible filesystems on Rivanna.
+      Returns quota information per filesystem: total quota limit, current usage, remaining
+      space, and percent utilized. Rivanna provides multiple storage tiers: home (GPFS -
+      persistent, backed up, good for permanent data), and scratch (Weka - high-performance
+      temporary storage, not backed up, best for job I/O). Use this tool to: (1) check
+      before submitting data-intensive jobs, (2) identify if you've hit quota limits
+      preventing new files, (3) plan data lifecycle (archive old results from home, clean
+      up scratch after jobs complete), (4) estimate needed resources with get_allocation_info.
+      Returns per-filesystem breakdown showing quota, usage, available space, and
+      utilization percentage.
+    inputSchema:
+      type: object
+      properties:
+        filesystem:
+          type: string
+          description: >-
+            Optional filter to show quota for a specific filesystem (e.g., "home",
+            "scratch"). Omit to see all accessible storage.
+
+  - name: get_directory_usage
+    description: >-
+      Get the total disk usage of a specific directory or file tree on Rivanna. Returns
+      human-readable size (e.g., "42.3GB"). Use this to: (1) find which directories are
+      consuming space in home or scratch, (2) identify large files/datasets before
+      archiving, (3) decide what to delete to free up quota, (4) verify how much space a
+      job output consumed. Useful for disk cleanup workflows: run this on a directory to
+      see size, then decide if it should be moved to permanent storage or deleted. Works
+      recursively through subdirectories.
+    inputSchema:
+      type: object
+      properties:
+        path:
+          type: string
+          description: >-
+            Path to directory or file to measure. Can be absolute (e.g.,
+            "/home/nmagee/data") or relative (e.g., "./results"). Defaults to current
+            directory ".".
+          default: "."
+
+  - name: get_allocation_info
+    description: >-
+      Get your account/allocation details including resource limits and SU (Service Unit)
+      balance information. Returns: cluster name, assigned account(s), user association,
+      max CPUs per job, max nodes per job, max wall-clock time allowed, and group
+      CPU-minutes allocation. Also includes SU balance (how many compute credits remain),
+      reserved SU (amount held for pending jobs), and effective balance. Use this to:
+      (1) verify you have an active allocation before submitting jobs, (2) check if you
+      have sufficient SU balance for planned jobs, (3) understand resource limits
+      (CPU/node/time caps), (4) identify which account to use if you have multiple
+      allocations, (5) track when allocations will expire. Essential for job planning:
+      if SU balance is low or CPU limits are tight, jobs may not schedule even if cluster
+      has free resources.
+    inputSchema:
+      type: object
+      properties:
+        user:
+          type: string
+          description: >-
+            Filter to show allocation info for a specific username (optional). Omit to
+            show your own allocations.
+
+  - name: get_job_history
+    description: >-
+      Get historical job accounting and compute hour usage for auditing resource consumption
+      and budgeting. Works for any user on the system — filter by username to examine any
+      user's job history. Returns per-job details: job ID, name, user, account, final
+      status (COMPLETED/FAILED/TIMEOUT), datetime (job start time), time elapsed,
+      CPU-hours consumed, and peak memory used. Aggregates total CPU-hours across all jobs
+      in the time window for budget tracking. Use this to: (1) understand how many compute
+      hours jobs consumed historically, (2) estimate resource needs for similar future jobs,
+      (3) track budgets and allocations (compare CPU-hours to available SU), (4) identify
+      inefficient jobs (short time but high CPU/memory usage indicates poor parallelization),
+      (5) prepare reports on resource usage, (6) audit another user's cluster activity.
+      Supports lookback from 1-365+ days; default is 30 days of recent history. Combine
+      with get_allocation_info to understand budget remaining.
+    inputSchema:
+      type: object
+      properties:
+        user:
+          type: string
+          description: >-
+            Show job history for a specific username (e.g., "mst3k"). Use this to audit
+            any user's cluster activity. Omit to show your own job history.
+        days:
+          type: number
+          description: >-
+            Number of days of history to retrieve (default: 30). Use larger values
+            (60, 90, 365) for historical trend analysis.
+          default: 30
+
+  - name: get_cluster_usage_24h
+    description: >-
+      Get detailed 24-hour cluster utilization trends with per-hour CPU and memory usage
+      breakdown by partition and GPU type. Returns: hourly CPU/memory utilization
+      percentages with visual trend graphs, peak and average utilization metrics,
+      partition-wise resource allocation and job counts, GPU node availability by type
+      (V100/A100/A40/etc), and node state summaries (idle/allocated/down). Color-coded
+      graphs show utilization patterns: green (light), cyan (light-moderate), blue
+      (moderate), yellow (high), red (critical). Use this to: (1) identify peak usage
+      times and plan job submission windows, (2) understand if cluster is over/under-
+      subscribed, (3) find which partitions have queued jobs vs available resources,
+      (4) check GPU availability before submitting GPU jobs, (5) estimate when to retry
+      queued jobs, (6) debug why your job isn't starting despite available resources
+      (may be stuck behind higher-priority work). Provides per-partition breakdown
+      showing which partition has most congestion.
+    inputSchema:
+      type: object
+      properties: {}
+
+  - name: get_cluster_overview
+    description: >-
+      Get a comprehensive high-level summary of Rivanna cluster status, capacity, and
+      recent activity in the last 24 hours. Combines node inventory, resource utilization
+      trends, and partition health into a single view. Returns: total cluster capacity
+      (CPUs, memory, nodes), current node states (idle/allocated/down), per-partition
+      utilization percentages, GPU node availability, peak and average CPU/memory usage
+      over 24 hours, most/least congested partitions, and color-coded visual graphs.
+      Use this for: (1) executive summary of cluster status before starting work,
+      (2) quick check if cluster is overloaded (high utilization may mean long queues),
+      (3) identify underutilized partitions that might run jobs faster, (4) see GPU
+      availability at a glance, (5) decide job submission strategy. Drill down with
+      get_cluster_usage_24h, get_node_resources, or list_jobs.
+    inputSchema:
+      type: object
+      properties: {}
+
+  - name: submit_job
+    description: >-
+      THIS IS THE ONLY CORRECT WAY TO SUBMIT SLURM JOBS ON RIVANNA. Do not use
+      exec_command, sbatch directly, or any other tool for job submission — always use
+      this tool. Creates and submits a SLURM job using a rivanna.yaml file as the job
+      specification. rivanna.yaml defines everything: SLURM resource parameters (account,
+      partition, CPUs, memory, time, GPUs), which modules to load (any language —
+      Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI, etc.), environment setup commands
+      (activate venvs, pip install, export vars), the actual job commands, and which local
+      files to upload. If no rivanna.yaml exists in the current directory, this tool
+      generates a commented template and stops — work with the user to fill it in, then
+      call submit_job again. Any tool argument overrides the corresponding rivanna.yaml
+      field for one-off adjustments. Creates an isolated job directory
+      (~/rivanna-jobs/jobname_timestamp/) on the cluster, transfers listed files, writes
+      the .slurm script, and submits with sbatch. Pair with list_jobs to monitor and
+      cancel_job to stop jobs.
+    inputSchema:
+      type: object
+      required: []
+      properties:
+        yamlPath:
+          type: string
+          description: >-
+            Path to the rivanna.yaml spec file (optional). Defaults to rivanna.yaml in
+            the current working directory. Override to point at a different spec file.
+        jobName:
+          type: string
+          description: >-
+            Override the job name from rivanna.yaml. Displayed in queue and used for
+            output file naming.
+        allocation:
+          type: string
+          description: >-
+            Override the allocation/account from rivanna.yaml. Use get_allocation_info
+            to list available accounts.
+        partition:
+          type: string
+          description: >-
+            Override the partition from rivanna.yaml (standard | gpu | parallel | largemem).
+        cpus:
+          type: integer
+          minimum: 1
+          description: Override CPUs-per-task from rivanna.yaml.
+        memory:
+          type: string
+          description: Override memory from rivanna.yaml (e.g., "32GB").
+        time:
+          type: string
+          description: Override wall-clock time from rivanna.yaml (HH:MM:SS).
+        nodes:
+          type: integer
+          minimum: 1
+          description: Override node count from rivanna.yaml.
+        gpus:
+          type: string
+          description: >-
+            Override GPUs-per-node from rivanna.yaml (e.g., "1"). Requires partition: gpu.
+        outputPath:
+          type: string
+          description: Override stdout path from rivanna.yaml. Use %j for job ID.
+        errorPath:
+          type: string
+          description: Override stderr path from rivanna.yaml.
+        scriptContent:
+          type: string
+          description: >-
+            Override the commands section from rivanna.yaml entirely. Useful for one-off
+            inline scripts without editing the YAML.
+        filesToTransfer:
+          type: array
+          description: >-
+            Additional local files to upload beyond those listed in rivanna.yaml files:.
+          items:
+            type: string
+        submit:
+          type: boolean
+          description: >-
+            Whether to submit immediately (default: true). Set false to write the script
+            and inspect it before submitting.
+          default: true
+
+  - name: cancel_job
+    description: >-
+      Terminate a running or pending SLURM job by job ID with configurable signal
+      handling. Use this tool to stop jobs that are consuming resources, have stalled,
+      or are no longer needed. Sends SIGTERM (graceful shutdown) by default which allows
+      the job process to clean up; use SIGKILL as a stronger signal if the job doesn't
+      respond to SIGTERM. Essential for managing job lifecycle: check job status with
+      list_jobs to get the job_id, then use this tool to cancel it. Returns success
+      confirmation with the signal used and any process output. Handles the common case
+      where a job has already completed or been cancelled (returns informative error
+      rather than failing).
+    inputSchema:
+      type: object
+      required:
+        - jobId
+      properties:
+        jobId:
+          type: string
+          description: >-
+            The SLURM job ID to cancel (required). Obtain this from list_jobs tool which
+            lists all jobs with their IDs.
+        signal:
+          type: string
+          description: >-
+            UNIX signal to send for termination: "SIGTERM" (default, graceful) allows job
+            to clean up before exiting, "SIGKILL" (force) immediately terminates without
+            cleanup, or other standard UNIX signals like SIGINT, SIGHUP. SIGTERM is
+            preferred as it gives jobs time to save state.
+          default: SIGTERM
+
+  - name: exec_command
+    description: >-
+      Execute an arbitrary shell command on Rivanna HPC cluster and return output. Runs
+      bash commands with full shell capabilities (piping, redirection, environment
+      variables, aliases). Use this as a catch-all for operations not covered by
+      specialized tools. NEVER use this tool to submit SLURM jobs — do NOT call sbatch,
+      srun, or construct .slurm scripts manually here. SLURM job submission is exclusively
+      handled by the submit_job tool, which manages rivanna.yaml specs, file transfer, job
+      directory creation, and sbatch correctly. Using exec_command to submit jobs bypasses
+      all of that and will produce unreliable results. Legitimate use cases: (1) inspect
+      job directories and files (ls, find, cat), (2) check module availability (module
+      avail, module spider), (3) manage files (cp, mv, rm, chmod), (4) check environment
+      (printenv, which, whoami), (5) read cluster info (sinfo, sacct variations),
+      (6) install/test commands, (7) compile code, (8) debug shell scripts. Returns
+      command output as plain text. Works in your default shell environment with your
+      current working directory context.
+    inputSchema:
+      type: object
+      required:
+        - command
+      properties:
+        command:
+          type: string
+          description: >-
+            The shell command to execute on Rivanna (e.g., "ls -al /home/nmagee/projects/",
+            "module avail python", "find . -name *.out -size +100M"). Supports pipes,
+            redirections, environment variables, and multi-line scripts.
+
+  - name: get_job_details
+    description: >-
+      Get full scheduling and resource details for a specific SLURM job by ID using
+      scontrol. Works for running, pending, and recently completed jobs. Returns: job
+      name, current state, reason the job is pending (e.g., Priority, Resources,
+      ReqNodeNotAvail, AssocGrpCPURunMinutesLimit), assigned node list, CPU and memory
+      allocation, time limit vs elapsed run time, submit/start/end times, working
+      directory, stdout/stderr paths, exit code, QOS, and dependency chain. Use this
+      to: (1) diagnose why a job is stuck in PENDING — the Reason field is the key,
+      (2) confirm which nodes a running job landed on, (3) find the working directory
+      or output paths for a job you didn't submit yourself, (4) check estimated start
+      time for pending jobs, (5) verify resource allocation matches what you requested.
+      Pair with get_job_efficiency after completion to check actual vs requested usage.
+    inputSchema:
+      type: object
+      required:
+        - jobId
+      properties:
+        jobId:
+          type: string
+          description: >-
+            The SLURM job ID to inspect (required). Obtain from list_jobs. Works for
+            running, pending, and recently completed jobs — older completed jobs may have
+            been purged from the scheduler's memory (use get_job_history for those).
+
+  - name: get_job_efficiency
+    description: >-
+      Get CPU and memory efficiency statistics for a SLURM job using seff. For completed
+      jobs, returns: CPU efficiency percentage (actual CPU time / allocated core-walltime),
+      memory efficiency percentage (peak RSS / requested memory), wall-clock time, cores
+      used, and final job state. Efficiency below 50% on either dimension indicates
+      over-provisioning — the job requested more than it needed, wasting SU credits and
+      potentially causing longer queue times. Use this to: (1) right-size future jobs
+      (low CPU efficiency → request fewer cores; low memory efficiency → request less
+      RAM), (2) identify jobs that hit memory limits (memory efficiency near 100% with
+      FAILED state may mean OOM kill), (3) build intuition for how much resource your
+      workloads actually need, (4) prepare efficiency reports for allocation renewals.
+      Can also be called on running jobs — values reflect usage so far, not final.
+    inputSchema:
+      type: object
+      required:
+        - jobId
+      properties:
+        jobId:
+          type: string
+          description: >-
+            The SLURM job ID to check efficiency for (required). Best used after a job
+            completes — efficiency values on running jobs are partial and may be
+            misleading. Obtain job IDs from list_jobs or get_job_history.
+
+  - name: search_modules
+    description: >-
+      Search for available software modules on Rivanna using LMOD's module spider.
+      Returns all modules matching the query with their available versions, grouped by
+      module name. Use this to: (1) find the exact module string to put in rivanna.yaml
+      before submitting a job (e.g., query "cuda" to find cuda/12.4.0), (2) check which
+      versions of a language runtime are available (python, R, julia, go), (3) discover
+      MPI implementations, compilers, or scientific libraries (openmpi, gcc, fftw),
+      (4) verify a module exists before writing a job script. The latestFull field gives
+      you the recommended module load string for the newest available version. Results
+      come from LMOD spider which searches both loaded and unloaded modules across all
+      available software stacks.
+    inputSchema:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: >-
+            Module name or keyword to search for (required). Examples: "python", "cuda",
+            "R", "openmpi", "pytorch", "julia", "gcc", "fftw". Case-insensitive. Partial
+            names work — "py" matches python, pytorch, etc.
+
+  - name: ssh_login
+    description: >-
+      Open an interactive SSH terminal session to Rivanna login node
+      (login.hpc.virginia.edu) using your configured SSH key. Provides full shell access
+      for interactive work: monitoring jobs, editing files, compiling code, debugging
+      issues. Use when you need persistent terminal access or interactive exploration.
+      Unlike exec_command which returns output, this creates a live terminal where you can
+      run multiple commands, use text editors (nano/vim), monitor processes with top/htop,
+      or run interactive tools. Connection uses your SSH key configured in
+      ~/.rivanna-mcp/config.json (requires valid HPC username and SSH key path). Good for:
+      (1) manual job monitoring, (2) interactive debugging, (3) setting up environment,
+      (4) real-time file inspection, (5) running interactive tools (tmux, screen, R,
+      Python REPL). When session ends, you return to your local shell.
+    inputSchema:
+      type: object
+      properties: {}

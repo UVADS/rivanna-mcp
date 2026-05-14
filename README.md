@@ -40,6 +40,9 @@ graph LR
         Rivanna -->|sinfo| SInfo["📊 Node Resources"]
         Rivanna -->|sbatch| SBatch["📊 Job Submission"]
         Rivanna -->|sacct| SAckt["📊 Job Accounting"]
+        Rivanna -->|scontrol| SControl["📊 Job Details"]
+        Rivanna -->|seff| SEff["📊 Job Efficiency"]
+        Rivanna -->|module spider| SMod["📊 Module Search"]
     end
     
     style LOCAL fill:#fef3c7,stroke:#b45309,color:#1e1e1e
@@ -56,6 +59,9 @@ graph LR
     style SInfo fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
     style SBatch fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
     style SAckt fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SControl fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SEff fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
+    style SMod fill:#93c5fd,stroke:#1e3a5f,color:#1e3a5f
 ```
 
 **How It Works:**
@@ -72,14 +78,14 @@ The MCP server:
 - Parses SLURM command output into structured data
 - Returns results via the MCP protocol
 
-## The Twelve Tools:
+## The Fifteen Tools:
 
 MCP servers offer "tools" to do specific tasks or communicate with external systems.
 Unlike an API where your request must conform precisely to a resource, its method and
 parameters, MCP tools are invoked by way of plain language requests from AI enabled
 IDEs or agents.
 
-The twelve tools in the Rivanna MCP are:
+The fifteen tools in the Rivanna MCP are:
 
 1. **Cluster Overview** — Returns a comprehensive snapshot of the entire Rivanna cluster, including capacity, GPU availability, node status, and 24-hour trends.
 2. **Cluster Usage (24h)** — Shows CPU and memory utilization trends for the past 24 hours rendered as colored ASCII graphics.
@@ -93,6 +99,9 @@ The twelve tools in the Rivanna MCP are:
 10. **Cancel Job** — Cancels a running or pending SLURM job by ID, with optional signal selection.
 11. **SSH Login** — Opens an interactive SSH session to Rivanna's login node using your configured credentials.
 12. **Execute Command** — Runs an arbitrary shell command on Rivanna and returns its output directly to your IDE.
+13. **Job Details** — Fetches full scheduling and resource information for a specific job via `scontrol`, including the pending reason, assigned nodes, time limits, and output paths.
+14. **Job Efficiency** — Reports CPU and memory efficiency percentages for a completed job via `seff`, enabling resource right-sizing for future submissions.
+15. **Search Modules** — Searches Rivanna's LMOD software stack via `module spider` and returns matching module names with all available versions.
 
 Read more detail about each tool with examples below.
 
@@ -493,6 +502,53 @@ Execute arbitrary shell commands directly on Rivanna and get the output back to 
 - "Run this command on the cluster: `ls -al $HOME/projects`"
 - "Show me the 5 largest files in my home directory"
 - "Execute: `du -sh /scratch/mst3k/* | sort -h`"
+
+### Job Details
+Get full scheduling and resource information for a specific job using `scontrol show job`.
+
+**Parameters:**
+- `jobId` (string, required): The SLURM job ID to inspect (obtain from `list_jobs`)
+
+**Returns:** job name, state, pending reason, assigned node list, CPU/memory allocation, time limit vs elapsed, submit/start/end times, working directory, stdout/stderr paths, exit code, QOS, and dependency chain.
+
+**Example Prompts:**
+- "Why is job 1234567 still pending?"
+- "Show me the full details for job 1234567"
+- "Which nodes is job 1234567 running on?"
+- "What's the working directory for job 1234567?"
+
+> **Tip:** The `reason` field directly answers "why is my job stuck?" — common values are `Priority` (waiting its turn), `Resources` (not enough free nodes), `ReqNodeNotAvail` (requested nodes are down), and `AssocGrpCPURunMinutesLimit` (allocation budget exhausted).
+
+### Job Efficiency
+Get CPU and memory efficiency statistics for a completed job using `seff`.
+
+**Parameters:**
+- `jobId` (string, required): The SLURM job ID to check (obtain from `list_jobs` or `get_job_history`)
+
+**Returns:** CPU efficiency percentage, memory efficiency percentage, wall-clock time, cores allocated, and final job state.
+
+**Example Prompts:**
+- "How efficiently did job 1234567 use its resources?"
+- "Did job 1234567 over-request memory?"
+- "Show me the CPU and memory efficiency for my last job"
+- "Help me right-size the resources for my next submission based on job 1234567"
+
+> **Tip:** Efficiency below ~50% on either CPU or memory means you requested roughly twice what you needed — future jobs will queue faster and consume fewer SUs with smaller requests.
+
+### Search Modules
+Search Rivanna's LMOD software stack for available modules and their versions using `module spider`.
+
+**Parameters:**
+- `query` (string, required): Module name or keyword to search for (e.g., `python`, `cuda`, `R`, `openmpi`)
+
+**Returns:** Grouped list of matching modules, each with all available versions and a `latestFull` string ready to paste into `rivanna.yaml`.
+
+**Example Prompts:**
+- "What versions of CUDA are available on Rivanna?"
+- "Search for Python modules"
+- "Is PyTorch available as a module?"
+- "Find the right module string for OpenMPI"
+- "What R versions can I load?"
 
 ## Planned: Project Configuration with `rivanna.yaml`
 
