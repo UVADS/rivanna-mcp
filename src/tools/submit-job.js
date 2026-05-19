@@ -1,11 +1,14 @@
 import { shellQuote } from '../utils.js';
-import { basename, resolve } from 'path';
+import { basename, join, resolve } from 'path';
 import { promises as fs } from 'fs';
+import { homedir } from 'os';
 import { load as parseYaml } from 'js-yaml';
 import { loadSlurmDefaults } from '../commands/slurm-defaults.js';
 import { getToolDef } from './loader.js';
 
 const RIVANNA_YAML = 'rivanna.yaml';
+const RIVANNA_MCP_DIR = join(homedir(), '.rivanna-mcp');
+const SLURM_TEMPLATE_PATH = join(RIVANNA_MCP_DIR, 'submit.slurm');
 
 function generateDefaultJobName() {
   const dirName = basename(process.cwd()).replace(/[^a-z0-9-]/gi, '').toLowerCase();
@@ -568,8 +571,73 @@ ${filesSection}
 `;
 }
 
+async function readSlurmTemplate() {
+  try {
+    return await fs.readFile(SLURM_TEMPLATE_PATH, 'utf-8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw new Error(`Failed to read submit.slurm template: ${err.message}`);
+  }
+}
+
+function applySlurmTokens(content, values) {
+  return content
+    .replace(/\{\{JOB_NAME\}\}/g, values.jobName ?? '')
+    .replace(/\{\{ACCOUNT\}\}/g, values.account ?? '')
+    .replace(/\{\{PARTITION\}\}/g, values.partition ?? '')
+    .replace(/\{\{NODES\}\}/g, String(values.nodes ?? ''))
+    .replace(/\{\{CPUS\}\}/g, String(values.cpus ?? ''))
+    .replace(/\{\{MEMORY\}\}/g, values.memory ?? '')
+    .replace(/\{\{TIME\}\}/g, values.time ?? '')
+    .replace(/\{\{CHDIR\}\}/g, values.chdir ?? '')
+    .replace(/\{\{OUTPUT\}\}/g, values.output ?? '')
+    .replace(/\{\{ERROR\}\}/g, values.error ?? '')
+    .replace(/\{\{GPUS\}\}/g, values.gpus ?? '');
+}
+
+function generateSlurmTemplate() {
+  return `#!/bin/bash
+# submit.slurm — Rivanna MCP advanced SLURM template
+# Place this file in ~/.rivanna-mcp/ — the MCP substitutes {{TOKENS}} when writing job scripts.
+# Edit to match your workflow. You may hardcode any value you don't want the MCP to override.
+#
+# Available tokens: {{JOB_NAME}}, {{ACCOUNT}}, {{PARTITION}}, {{NODES}}, {{CPUS}},
+#                   {{MEMORY}}, {{TIME}}, {{CHDIR}}, {{OUTPUT}}, {{ERROR}}, {{GPUS}}
+
+#SBATCH --job-name={{JOB_NAME}}
+#SBATCH --account={{ACCOUNT}}
+#SBATCH --partition={{PARTITION}}
+#SBATCH --nodes={{NODES}}
+#SBATCH --cpus-per-task={{CPUS}}
+#SBATCH --mem={{MEMORY}}
+#SBATCH --time={{TIME}}
+#SBATCH --chdir={{CHDIR}}
+#SBATCH --output={{OUTPUT}}
+#SBATCH --error={{ERROR}}
+# #SBATCH --gpus-per-node={{GPUS}}    # uncomment for GPU jobs; also set partition=gpu
+
+# --- Modules ---
+# module load miniforge
+# module load gcc/11.4.0
+# module load cuda/11.8.0
+
+# --- Environment setup ---
+# source activate myenv
+# pip install -r requirements.txt
+# export PYTHONPATH=$PWD
+
+# --- Job commands ---
+echo "Job started on $(hostname) at $(date)"
+# python your_script.py
+# Rscript your_script.R
+# ./your_binary
+echo "Job finished at $(date)"
+`;
+}
+
 export async function submitJob(sshClient, options = {}, config = {}) {
   const slurmDefaults = await loadSlurmDefaults();
+  const slurmMode = config.slurmMode || 'basic';
 
   const {
     jobName,
@@ -588,6 +656,131 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     yamlPath: yamlPathOverride,
   } = options;
 
+  // ── Advanced mode ────────────────────────────────────────────────────────
+  if (slurmMode === 'advanced') {
+    const templateContent = await readSlurmTemplate();
+
+    if (templateContent === null) {
+      // No template yet — generate and save one, then stop so user can review.
+      await fs.mkdir(RIVANNA_MCP_DIR, { recursive: true });
+      await fs.writeFile(SLURM_TEMPLATE_PATH, generateSlurmTemplate(), 'utf-8');
+      return {
+        success: false,
+        templateCreated: true,
+        templatePath: SLURM_TEMPLATE_PATH,
+        message:
+          `No submit.slurm template found. A starter template has been written to ` +
+          `${SLURM_TEMPLATE_PATH}. ` +
+          `Edit it — add your module loads, environment setup, and job commands — ` +
+          `then call submit_job again. ` +
+          `The MCP will substitute {{TOKENS}} (JOB_NAME, ACCOUNT, PARTITION, NODES, ` +
+          `CPUS, MEMORY, TIME, CHDIR, OUTPUT, ERROR, GPUS) with resolved values at submission time.`,
+      };
+    }
+
+    // Resolve SLURM params (args > slurm-defaults > config > built-ins)
+    const finalJobName   = jobName    || generateDefaultJobName();
+    const finalPartition = partition  || slurmDefaults?.partition || 'standard';
+    const finalCpus      = cpus       || slurmDefaults?.cpus      || 4;
+    const finalMemory    = memory     || slurmDefaults?.memory    || '16GB';
+    const finalTime      = time       || slurmDefaults?.time      || '01:00:00';
+    const finalNodes     = nodes      || slurmDefaults?.nodes     || 1;
+    const finalGpus      = gpus       || slurmDefaults?.gpus      || null;
+    const finalSubmit    = submit !== undefined ? submit : true;
+
+    const resolvedAllocation =
+      allocation || slurmDefaults?.allocation || config.defaultAllocation;
+
+    if (!resolvedAllocation) {
+      throw new Error(
+        'No allocation set. Pass allocation as a tool argument, or set a default ' +
+        'via `rivanna-mcp setup` (use get_allocation_info to list your available allocations).'
+      );
+    }
+
+    // Create isolated job directory on the cluster
+    const homeDir = await sshClient.exec('echo $HOME');
+    const homePath = homeDir.trim();
+    const slurmJobsFolder = config?.slurmJobsPath || 'rivanna-jobs';
+    const tier1Dir = slurmJobsFolder.startsWith('/') ? slurmJobsFolder : `${homePath}/${slurmJobsFolder}`;
+    const jobDirName = `${finalJobName}_${Date.now()}`;
+    const jobDir = `${tier1Dir}/${jobDirName}`;
+    await sshClient.exec(`mkdir -p ${shellQuote(jobDir)}`);
+
+    // Transfer any explicitly requested files
+    const transferredFiles = [];
+    for (const localFile of filesToTransfer.map(f => resolve(f))) {
+      try {
+        await sshClient.transferFile(localFile, jobDir);
+        transferredFiles.push(localFile.split('/').pop());
+      } catch (err) {
+        throw new Error(`Failed to transfer ${localFile}: ${err.message}`);
+      }
+    }
+
+    // Apply token substitution
+    const finalOutputPath = outputPath || `${jobDir}/%j.out`;
+    const finalErrorPath  = errorPath  || `${jobDir}/%j.err`;
+
+    const script = applySlurmTokens(templateContent, {
+      jobName:   finalJobName,
+      account:   resolvedAllocation,
+      partition: finalPartition,
+      nodes:     finalNodes,
+      cpus:      finalCpus,
+      memory:    finalMemory,
+      time:      finalTime,
+      chdir:     jobDir,
+      output:    finalOutputPath,
+      error:     finalErrorPath,
+      gpus:      finalGpus ?? '',
+    });
+
+    // Write the resolved script to the job directory
+    const jobFileName = `${finalJobName}.slurm`;
+    const jobFilePath = `${jobDir}/${jobFileName}`;
+    await sshClient.exec(
+      `cat > ${shellQuote(jobFilePath)} << 'EOFSCRIPT'\n${script}\nEOFSCRIPT`
+    );
+    await sshClient.exec(`chmod +x ${shellQuote(jobFilePath)}`);
+
+    const result = {
+      success: true,
+      mode: 'advanced',
+      templatePath: SLURM_TEMPLATE_PATH,
+      jobDir,
+      jobDirName,
+      jobFilePath,
+      jobFileName,
+      jobScript: script,
+      outputFile: finalOutputPath,
+      errorFile: finalErrorPath,
+      filesTransferred: transferredFiles,
+      submitted: false,
+    };
+
+    if (finalSubmit) {
+      try {
+        const submitOutput = await sshClient.exec(`sbatch ${shellQuote(jobFilePath)}`);
+        const match = submitOutput.match(/Submitted batch job (\d+)/);
+        if (match) {
+          result.jobId = match[1];
+          result.submitted = true;
+          result.message = `Job submitted successfully with ID ${match[1]}`;
+        } else {
+          result.warning = 'Job may have been submitted but could not parse job ID';
+          result.submitOutput = submitOutput;
+        }
+      } catch (err) {
+        result.error = `Failed to submit job: ${err.message}`;
+        result.submitted = false;
+      }
+    }
+
+    return result;
+  }
+
+  // ── Basic mode (rivanna.yaml) ────────────────────────────────────────────
   // Locate and read rivanna.yaml
   const cwd = process.cwd();
   const yamlPath = yamlPathOverride ? resolve(yamlPathOverride) : resolve(cwd, RIVANNA_YAML);

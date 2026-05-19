@@ -197,18 +197,28 @@ tools:
     description: >-
       THIS IS THE ONLY CORRECT WAY TO SUBMIT SLURM JOBS ON RIVANNA. Do not use
       exec_command, sbatch directly, or any other tool for job submission — always use
-      this tool. Creates and submits a SLURM job using a rivanna.yaml file as the job
-      specification. rivanna.yaml defines everything: SLURM resource parameters (account,
-      partition, CPUs, memory, time, GPUs), which modules to load (any language —
-      Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI, etc.), environment setup commands
-      (activate venvs, pip install, export vars), the actual job commands, and which local
-      files to upload. If no rivanna.yaml exists in the current directory, this tool
-      generates a commented template and stops — work with the user to fill it in, then
-      call submit_job again. Any tool argument overrides the corresponding rivanna.yaml
-      field for one-off adjustments. Creates an isolated job directory
-      (~/rivanna-jobs/jobname_timestamp/) on the cluster, transfers listed files, writes
-      the .slurm script, and submits with sbatch. Pair with list_jobs to monitor and
-      cancel_job to stop jobs.
+      this tool. Operates in one of two modes configured during `rivanna-mcp setup`.
+
+      BASIC MODE (default): Uses a rivanna.yaml file in the current working directory.
+      rivanna.yaml defines SLURM resource parameters (account, partition, CPUs, memory,
+      time, GPUs), modules to load (Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI,
+      etc.), environment setup commands (activate venvs, pip install, export vars), the
+      actual job commands, and which local files to upload. If no rivanna.yaml exists, a
+      tailored template is generated for the detected language — the user MUST edit it
+      before calling submit_job again. Any tool argument overrides the corresponding
+      rivanna.yaml field for one-off adjustments.
+
+      ADVANCED MODE: Uses ~/.rivanna-mcp/submit.slurm as a reusable job template. The
+      template may contain {{TOKENS}} that the MCP substitutes with resolved values:
+      JOB_NAME, ACCOUNT, PARTITION, NODES, CPUS, MEMORY, TIME, CHDIR, OUTPUT, ERROR,
+      GPUS. Values resolve as: tool arg > slurm-defaults > config > built-in defaults.
+      Advanced users control all module loads and job commands directly in the template.
+      If no template exists, a starter is generated at ~/.rivanna-mcp/submit.slurm and
+      the tool stops — edit it, then call submit_job again.
+
+      In both modes: creates an isolated job directory (~/rivanna-jobs/jobname_timestamp/)
+      on the cluster, transfers any filesToTransfer, writes the .slurm script, and submits
+      with sbatch. Pair with list_jobs to monitor and cancel_job to stop jobs.
     inputSchema:
       type: object
       required: []

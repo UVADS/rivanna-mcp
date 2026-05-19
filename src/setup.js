@@ -180,6 +180,22 @@ export async function runSetup() {
     default: true,
   });
 
+  dynamicQuestions.push({
+    type: 'list',
+    name: 'slurmMode',
+    message: 'SLURM job submission mode:',
+    choices: [
+      {
+        name: 'Basic  — guided rivanna.yaml workflow (recommended for most users)',
+        value: 'basic',
+      },
+      {
+        name: 'Advanced — custom submit.slurm template in ~/.rivanna-mcp/',
+        value: 'advanced',
+      },
+    ],
+  });
+
   const answers = await inquirer.prompt(dynamicQuestions);
 
   // Test connection if remote
@@ -239,6 +255,7 @@ export async function runSetup() {
     hpcHost: HPC_HOST,
     logging: answers.logging,
     slurmJobsPath: answers.slurmJobsPath.trim(),
+    slurmMode: answers.slurmMode,
     createdAt: new Date().toISOString(),
   };
 
@@ -270,6 +287,7 @@ export async function runSetup() {
   console.log(`   HPC Host: ${config.hpcHost}`);
   console.log(`   SLURM Jobs Folder: ~/${config.slurmJobsPath}`);
   console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
+  console.log(`   SLURM Mode: ${config.slurmMode === 'advanced' ? 'Advanced (submit.slurm template)' : 'Basic (rivanna.yaml)'}`);
   if (defaultAllocation) {
     console.log(`   Default Allocation: ${defaultAllocation}`);
   }
@@ -277,6 +295,13 @@ export async function runSetup() {
     console.log(`\n🔐 SSH Connection: Connected as ${testResult.username}`);
   } else {
     console.log(`\n✅ Local mode configured`);
+  }
+  if (config.slurmMode === 'advanced') {
+    console.log(`\n📝 Advanced SLURM mode selected.`);
+    console.log(`   Create your reusable job template at: ~/.rivanna-mcp/submit.slurm`);
+    console.log(`   Use {{TOKENS}} for values the MCP fills in at submission time:`);
+    console.log(`   JOB_NAME, ACCOUNT, PARTITION, NODES, CPUS, MEMORY, TIME, CHDIR, OUTPUT, ERROR, GPUS`);
+    console.log(`   Run submit_job from any project to auto-generate a starter template if you haven't created one yet.`);
   }
   console.log(
     `\n🚀 You can now use the MCP server. It will be available for Claude Code integration.\n`
