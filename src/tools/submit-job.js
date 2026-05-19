@@ -654,7 +654,10 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     filesToTransfer = [],
     submit,
     yamlPath: yamlPathOverride,
+    yamlConfirmed = false,
   } = options;
+
+  const requireYamlConfirmation = config.requireYamlConfirmation !== false;
 
   // ── Advanced mode ────────────────────────────────────────────────────────
   if (slurmMode === 'advanced') {
@@ -795,14 +798,33 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     return {
       success: false,
       yamlCreated: true,
+      awaitingConfirmation: true,
       yamlPath,
+      yamlContent: template,
       detectedLanguage: detected,
       message:
         `No ${RIVANNA_YAML} found in ${cwd}. ` +
         `A tailored template has been created at ${yamlPath} ` +
         `(detected: ${detected}). ` +
-        `Please review it — set your account, confirm the modules and commands — ` +
-        `then call submit_job again.`,
+        `SHOW THE USER THE FULL yamlContent ABOVE. ` +
+        `Ask them to review it — confirm the account name, modules, and commands are correct. ` +
+        `Only call submit_job again with yamlConfirmed: true after the user explicitly approves it.`,
+    };
+  }
+
+  // YAML exists — enforce review gate if configured
+  if (requireYamlConfirmation && !yamlConfirmed) {
+    const yamlContent = await fs.readFile(yamlPath, 'utf-8');
+    return {
+      success: false,
+      awaitingConfirmation: true,
+      yamlPath,
+      yamlContent,
+      message:
+        `YAML REVIEW REQUIRED. ` +
+        `Show the user the full yamlContent above and ask them to confirm it is correct ` +
+        `before proceeding. Once the user explicitly approves, call submit_job again ` +
+        `with yamlConfirmed: true. Do NOT call submit_job again until the user confirms.`,
     };
   }
 

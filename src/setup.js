@@ -196,6 +196,13 @@ export async function runSetup() {
     ],
   });
 
+  dynamicQuestions.push({
+    type: 'confirm',
+    name: 'requireYamlConfirmation',
+    message: 'Require explicit user approval of rivanna.yaml before every job submission? (Recommended — prevents accidental submissions)',
+    default: true,
+  });
+
   const answers = await inquirer.prompt(dynamicQuestions);
 
   // Test connection if remote
@@ -256,6 +263,7 @@ export async function runSetup() {
     logging: answers.logging,
     slurmJobsPath: answers.slurmJobsPath.trim(),
     slurmMode: answers.slurmMode,
+    requireYamlConfirmation: answers.requireYamlConfirmation,
     createdAt: new Date().toISOString(),
   };
 
@@ -288,6 +296,7 @@ export async function runSetup() {
   console.log(`   SLURM Jobs Folder: ~/${config.slurmJobsPath}`);
   console.log(`   Logging: ${config.logging ? 'Enabled (' + join(CONFIG_DIR, 'history.log') + ')' : 'Disabled'}`);
   console.log(`   SLURM Mode: ${config.slurmMode === 'advanced' ? 'Advanced (submit.slurm template)' : 'Basic (rivanna.yaml)'}`);
+  console.log(`   YAML Confirmation Gate: ${config.requireYamlConfirmation ? 'Enabled (user must approve rivanna.yaml before each submission)' : 'Disabled'}`);
   if (defaultAllocation) {
     console.log(`   Default Allocation: ${defaultAllocation}`);
   }
