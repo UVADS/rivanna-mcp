@@ -109,12 +109,10 @@ Read more detail about each tool with examples below.
 
 ### Prerequisites
 
-- `node` and `npm` on your system. In Rivanna you can load this as a module.
-- An active Rivanna HPC account and allocation.
-- **SSH key pair** generated and authorized on Rivanna's login node
-- **Network access**: UVA network or VPN connection for remote access
-- `git` installed (for GitHub-based installation)
-- SSH access enabled if working remotely.
+- Install [`node`](https://nodejs.org/en/download) and `npm` on your system. In Rivanna you can load this as a module.
+- Have an active Rivanna HPC account and allocation.
+- Generate an **SSH key pair** and add it to `~/.ssh/authorized_keys` in your Rivanna home directory
+- Establish **UVA network access**: Be on a campus network or VPN connection for remote access
 
 ### Install for Your Client
 
