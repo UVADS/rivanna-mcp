@@ -116,7 +116,7 @@ Read more detail about each tool with examples below.
 
 ### Install for Your Client
 
-Install globally first:
+First, install globally and run the setup:
 ```bash
 npm install -g github:uvads/rivanna-mcp && rivanna-mcp setup
 ```
