@@ -1,6 +1,23 @@
 import { shellQuote } from '../utils.js';
 import { getToolDef } from './loader.js';
 
+// Default Rivanna quotas, used to compute percentUsed regardless of what
+// hdquota reports as the quota/limit column.
+const HOME_QUOTA_BYTES = 200 * 1024 ** 3; // 200GB
+const SCRATCH_QUOTA_BYTES = 10 * 1024 ** 4; // 10TB
+
+function parseSizeToBytes(sizeStr) {
+  if (!sizeStr) return null;
+  const match = sizeStr.trim().match(/^([\d.]+)\s*([KMGTP]?)B?$/i);
+  if (!match) return null;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  const multipliers = { '': 1, K: 1024, M: 1024 ** 2, G: 1024 ** 3, T: 1024 ** 4, P: 1024 ** 5 };
+
+  return value * (multipliers[unit] ?? 1);
+}
+
 export async function getStorageQuota(sshClient, config = {}) {
   const username = config.computingId || (await sshClient.exec('whoami')).trim();
 
@@ -75,15 +92,27 @@ function parseHdquotaOutput(output, username) {
       path = `/sfs/weka/scratch/${username}`;
     }
 
+    let displayQuota = quota || 'N/A';
+    let displayPercent = percentStr || 'N/A';
+
+    const baselineBytes = type === 'home' ? HOME_QUOTA_BYTES : type === 'scratch' ? SCRATCH_QUOTA_BYTES : null;
+    if (baselineBytes) {
+      const usedBytes = parseSizeToBytes(used);
+      displayQuota = type === 'home' ? '200GB' : '10TB';
+      if (usedBytes !== null) {
+        displayPercent = `${((usedBytes / baselineBytes) * 100).toFixed(1)}%`;
+      }
+    }
+
     quotas.push({
       name,
       path,
       type,
       filesystem,
-      quota: quota || 'N/A',
+      quota: displayQuota,
       usage: used || 'N/A',
       available: available || 'N/A',
-      percentUsed: percentStr || 'N/A',
+      percentUsed: displayPercent,
     });
   }
 
