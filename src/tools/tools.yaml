@@ -199,24 +199,27 @@ tools:
       exec_command, sbatch directly, or any other tool for job submission — always use
       this tool. Operates in one of two modes configured during `rivanna-mcp setup`.
 
-      BASIC MODE (default): Uses a rivanna.yaml file in the current working directory.
+      1. BASIC MODE (default): Uses a rivanna.yaml file in the current working directory.
       rivanna.yaml defines SLURM resource parameters (account, partition, CPUs, memory,
       time, GPUs), modules to load (Python/miniforge, R, C/C++, Go, Julia, CUDA, MPI,
       etc.), environment setup commands (activate venvs, pip install, export vars), the
       actual job commands, and which local files to upload. Any tool argument overrides
       the corresponding rivanna.yaml field for one-off adjustments.
 
-      YAML REVIEW GATE (requireYamlConfirmation setting):
-      When the user has enabled requireYamlConfirmation in their config (the default for
-      new setups), this tool enforces a mandatory two-step review workflow:
+      In basic mode, raw .slurm scripts are NEVER shown to the user — they are an
+      internal implementation detail. The user only ever sees and edits rivanna.yaml.
+
+      YAML REVIEW GATE — ALWAYS ENFORCED IN BASIC MODE (unconditional, no config override):
 
         STEP 1 — Call submit_job WITHOUT yamlConfirmed. The tool will:
           a) If rivanna.yaml does not exist: auto-generate a tailored template, return its
              full content, and STOP. Show the content to the user. Do NOT call submit_job
              again until the user says they have reviewed and approved it.
+             The prompt MUST ask the user if they approve of the YAML template.
           b) If rivanna.yaml exists: return its full content and STOP with
              awaitingConfirmation=true. Show the content to the user. Do NOT call
              submit_job again until the user explicitly says they approve it.
+             The prompt MUST ask the user if they approve of the YAML template.
 
         STEP 2 — Only after the user has seen the YAML content AND explicitly said they
         approve it (e.g. "looks good", "submit it", "yes go ahead"), call submit_job
@@ -229,8 +232,10 @@ tools:
         - NEVER assume the user has reviewed the YAML — wait for explicit confirmation.
         - ALWAYS display the full yamlContent from the step-1 response before asking
           the user if they want to proceed.
+        - NEVER show the user a raw .slurm script in basic mode — if you see jobScript
+          in a response, do not display it.
 
-      ADVANCED MODE: Uses ~/.rivanna-mcp/submit.slurm as a reusable job template. The
+      2. ADVANCED MODE: Uses ~/.rivanna-mcp/submit.slurm as a reusable job template. The
       template may contain {{TOKENS}} that the MCP substitutes with resolved values:
       JOB_NAME, ACCOUNT, PARTITION, NODES, CPUS, MEMORY, TIME, CHDIR, OUTPUT, ERROR,
       GPUS. Values resolve as: tool arg > slurm-defaults > config > built-in defaults.
@@ -253,11 +258,10 @@ tools:
         yamlConfirmed:
           type: boolean
           description: >-
-            REQUIRED when requireYamlConfirmation is enabled in config (the default).
-            Set to true ONLY after the user has seen the rivanna.yaml content and
-            explicitly confirmed they want to proceed. Never pass true on the first
-            submit_job call in a session — always show the YAML to the user first and
-            wait for their explicit approval.
+            ALWAYS required in basic mode. Set to true ONLY after the user has seen
+            the full rivanna.yaml content and explicitly confirmed they want to proceed.
+            Never pass true on the first submit_job call in a session — always show the
+            YAML to the user first and wait for their explicit approval.
           default: false
         jobName:
           type: string

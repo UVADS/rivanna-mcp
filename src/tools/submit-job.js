@@ -657,8 +657,6 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     yamlConfirmed = false,
   } = options;
 
-  const requireYamlConfirmation = config.requireYamlConfirmation !== false;
-
   // ── Advanced mode ────────────────────────────────────────────────────────
   if (slurmMode === 'advanced') {
     const templateContent = await readSlurmTemplate();
@@ -812,8 +810,8 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     };
   }
 
-  // YAML exists — enforce review gate if configured
-  if (requireYamlConfirmation && !yamlConfirmed) {
+  // YAML exists — always enforce review gate in basic mode; the user must explicitly approve
+  if (!yamlConfirmed) {
     const yamlContent = await fs.readFile(yamlPath, 'utf-8');
     return {
       success: false,
@@ -937,7 +935,7 @@ export async function submitJob(sshClient, options = {}, config = {}) {
     jobDirName,
     jobFilePath,
     jobFileName,
-    jobScript: script,
+    // jobScript intentionally omitted in basic mode — raw SLURM is an internal detail
     outputFile: finalOutputPath,
     errorFile: finalErrorPath,
     filesTransferred: transferredFiles,
