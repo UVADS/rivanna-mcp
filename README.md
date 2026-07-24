@@ -1,6 +1,7 @@
 # Rivanna MCP
 
-![Beta](https://shields.io)
+![status](https://img.shields.io/badge/status-beta-orange)
+![GitHub Tag](https://img.shields.io/github/v/tag/uvads/rivanna-mcp)
 
 A local MCP (Model Context Protocol) server for querying Rivanna HPC cluster metrics and job information via SLURM. Integrates seamlessly with your development environment to give AI access to the Rivanna cluster status, your jobs, resources, and allocations.
 
