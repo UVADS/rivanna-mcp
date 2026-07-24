@@ -114,7 +114,7 @@ Read more detail about each tool with examples below.
 
 1. Be sure you have Node and `npm` installed.
 2. Set up SSH key authentication to Rivanna.
-3. Install the MCP using this command (you must install it for each separate project)
+3. Install the MCP using [this command](https://github.com/uvasds-systems/) (you must install it for each separate project)
 4. Run the setup command.
 5. You're ready to interact with Rivanna through your AI tools!
 
