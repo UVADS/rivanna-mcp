@@ -48,48 +48,41 @@ function parseHdquotaOutput(output, username) {
   const lines = output.trim().split('\n').filter(line => line.trim());
   const quotas = [];
 
-  // Expected hdquota -s format (varies, but typically):
-  // Filesystem    Size    Used    Avail   Use%
-  // OR
-  // name    quota   used    available   percent
+  // hdquota -s columns are separated by 2+ spaces, e.g.:
+  // Storage Type       Location            Size       Used      Avail  Use%
+  // Home Directory     /home/nem2p       200.0 GB    28.9 GB   171.1 GB   14%
+  // Splitting on runs of 2+ spaces keeps "200.0 GB" intact as one field and
+  // keeps "Home Directory" / "/home/nem2p" from bleeding into the numeric columns.
 
   for (const line of lines) {
-    if (!line || line.match(/^\s*(Filesystem|Name|---)/i)) continue;
+    const fields = line.trim().split(/\s{2,}/).map(f => f.trim()).filter(Boolean);
+    if (fields.length < 5) continue;
 
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 4) continue;
+    const percentStr = fields[fields.length - 1];
+    const available = fields[fields.length - 2];
+    const used = fields[fields.length - 3];
+    const quota = fields[fields.length - 4];
 
-    const filesystem = parts[0];
-    let quota, used, available, percentStr;
+    // Header and separator rows don't have a real "Use%" value in that slot; skip them.
+    if (!/^\d+(\.\d+)?%$/.test(percentStr)) continue;
 
-    // Try to identify which columns are which
-    // Look for percentage at the end (ends with %)
-    const percentIdx = parts.findIndex(p => p.includes('%'));
-    if (percentIdx > 0) {
-      percentStr = parts[percentIdx];
-      used = parts[percentIdx - 2];
-      quota = parts[percentIdx - 3];
-      available = parts[percentIdx - 1];
-    } else {
-      quota = parts[1];
-      used = parts[2];
-      available = parts[3];
-      percentStr = parts[4];
-    }
+    const labelFields = fields.slice(0, fields.length - 4);
+    const label = labelFields[0] || 'Unknown';
+    const reportedPath = labelFields.slice(1).join(' ') || null;
+    const lowerLabel = label.toLowerCase();
 
-    // Determine storage type based on path
     let type = 'other';
-    let name = `${filesystem} Storage`;
-    let path = filesystem;
+    let name = `${label} Storage`;
+    let path = reportedPath || label;
 
-    if (filesystem.includes('home')) {
+    if (lowerLabel.includes('home')) {
       type = 'home';
       name = 'Home Storage (GPFS)';
-      path = `/home/${username}`;
-    } else if (filesystem.includes('scratch') || filesystem.includes('weka')) {
+      path = reportedPath || `/home/${username}`;
+    } else if (lowerLabel.includes('scratch') || lowerLabel.includes('weka')) {
       type = 'scratch';
       name = 'Scratch Storage (Weka)';
-      path = `/sfs/weka/scratch/${username}`;
+      path = reportedPath || `/sfs/weka/scratch/${username}`;
     }
 
     let displayQuota = quota || 'N/A';
@@ -108,7 +101,7 @@ function parseHdquotaOutput(output, username) {
       name,
       path,
       type,
-      filesystem,
+      filesystem: label,
       quota: displayQuota,
       usage: used || 'N/A',
       available: available || 'N/A',

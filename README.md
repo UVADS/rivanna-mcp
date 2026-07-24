@@ -107,6 +107,14 @@ Read more detail about each tool with examples below.
 
 ## Installation
 
+### TL;DR
+
+1. Be sure you have Node and `npm` installed.
+2. Set up SSH key authentication to Rivanna.
+3. Install the MCP using this command (you must install it for each separate project)
+4. Run the setup command.
+5. You're ready to interact with Rivanna through your AI tools!
+
 ### Prerequisites
 
 - Install [`node`](https://nodejs.org/en/download) and `npm` on your system. In Rivanna you can load this as a module.
@@ -178,10 +186,13 @@ rivanna-mcp setup
 ```
 
 You'll be prompted for:
-- **Environment**: Are you working remotely or on a Rivanan compute node?
+- **Environment**: Are you working remotely or on a Rivanna compute node?
 - **Computing ID**: Your Rivanna username (e.g., `mst3k`).
-- **SSH Key Path**: Path to your SSH private key (e.g., `~/.ssh/my_key_rivanna`)
+- **SSH Key Path** (remote only): Path to your SSH private key (e.g., `~/.ssh/my_key_rivanna`)
+- **SLURM Jobs Path**: Folder name in your Rivanna `$HOME` for SLURM job directories (default: `rivanna-jobs`).
 - **Logging**: Would you like your MCP history saved to `~/.rivanna-mcp/history.log`.
+- **SLURM Job Mode**: Basic (guided `rivanna.yaml` workflow) or Advanced (custom `submit.slurm` template).
+- **YAML Confirmation Gate**: Require explicit approval of `rivanna.yaml` before every job submission (recommended, default: yes).
 - **Default Allocation**: Select your default allocation for SLURM submissions.
 
 The wizard will test your SSH connection and save your configuration to `~/.rivanna-mcp/config.json`.
@@ -195,17 +206,19 @@ rivanna-mcp slurm-defaults
 ```
 
 This interactive setup will guide you through:
-- **Allocation Account**: Which account to charge compute hours to
-- **Partition**: Your preferred queue (standard, gpu, parallel, largemem)
-- **CPUs**: Default number of CPU cores
-- **Memory**: Default memory allocation
-- **Wall-Clock Time**: Default job timeout
-- **Nodes/GPUs**: Defaults for parallel or GPU jobs (if applicable)
+- **Allocation**: Which account to charge compute hours against.
+- **Partition**: Your preferred SLURM queue (standard, gpu, parallel, largemem).
+- **CPUs**: Default number of CPU cores.
+- **Memory**: Default memory allocation.
+- **Wall-Clock Time**: Default job timeout.
+- **Nodes/GPUs**: Defaults for parallel or GPU jobs (if applicable).
+
+(SLURM Jobs Path and SLURM Job Mode are configured once during `rivanna-mcp setup`, not here — see [Run the Setup Wizard](#1-run-the-setup-wizard).)
 
 Your preferences are saved to `~/.rivanna-mcp/slurm-defaults.json` and will be used by:
-- **Claude Code**: When using the `submit_job` tool
-- **Any other tools**: That reference your SLURM preferences
-- **Future CLI commands**: Any other tools you build on top of rivanna-mcp
+- **Claude Code**: When using the `submit_job` tool.
+- **Any other tools**: That reference your SLURM preferences.
+- **Future CLI commands**: Any other tools you build on top of rivanna-mcp.
 
 You can always update your preferences by running the command again.
 
@@ -611,7 +624,7 @@ At submission time, values are resolved in this order (highest wins):
 1. Explicit tool arguments (e.g., partition: "gpu" passed to submit_job)
 2. rivanna.yaml job: section
 3. ~/.rivanna-mcp/slurm-defaults.json  (set via `rivanna-mcp slurm-defaults`)
-4. ~/.rivanna-mcp/config.json          (defaultAllocation only)
+4. ~/.rivanna-mcp/config.json          (defaultAllocation, for job resolution)
 5. Built-in fallbacks                  (partition: standard, cpus: 4, memory: 16GB)
 ```
 
