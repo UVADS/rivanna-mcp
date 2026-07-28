@@ -9,12 +9,12 @@ description: >-
   SUs, HPC storage/quota, or submitting/checking cluster jobs.
 
 # ── User configuration — EDIT THESE ────────────────────────────────────────
-computing_id: nmagee                       # UVA computing ID (the part before @virginia.edu)
+computing_id: <FILL_ME>                     # UVA computing ID (the part before @virginia.edu)
 ssh_key_path: <FILL_ME>                     # e.g. ~/.ssh/id_ed25519 — private key for login node
 allocation: <FILL_ME>                       # preferred SLURM account, e.g. my_group_alloc
 slurm_mode: simple                          # "simple" (rivanna.yaml) or "advanced" (JOB.slurm)
 ssh_host: login.hpc.virginia.edu            # Rivanna login node
-slurm_jobs_dir: rivanna-jobs                # remote folder (under $HOME) for job scratch dirs
+slurm_jobs_dir: rivanna-jobs                # remote folder (under $HOME) for job dirs
 ---
 
 # Rivanna HPC management skill
@@ -27,7 +27,7 @@ slurm_jobs_dir: rivanna-jobs                # remote folder (under $HOME) for jo
 
    ssh_key_path   Absolute or ~-relative path to the PRIVATE key that
                   authenticates to login.hpc.virginia.edu.
-                  Example: ~/.ssh/id_ed25519
+                  Example: ~/.ssh/id_mykey
                   The matching public key must already be authorized on
                   Rivanna, and the key must not trigger an interactive
                   password/Duo prompt (key-based auth only).
@@ -66,6 +66,7 @@ scp -i {ssh_key_path} <local_file> {computing_id}@{ssh_host}:<remote_dir>/
 ```
 
 **Assumptions & guardrails**
+- Assumes an SSH client is available on the localhost, callable as `ssh`.
 - Key-based auth to the login node is already configured (no interactive Duo/2FA
   prompt for the key). If SSH prompts for a password or MFA, tell the user to
   set up an SSH key and stop.
