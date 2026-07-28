@@ -1,5 +1,5 @@
 ---
-name: rivanna-hpc
+name: rivanna
 description: >-
   Manage the Rivanna HPC cluster at UVA over SSH: check storage quotas ($HOME and
   $SCRATCH), allocation SU balances, cluster CPU/GPU availability, job status,
