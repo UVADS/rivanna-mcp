@@ -11,14 +11,14 @@ A local MCP (Model Context Protocol) server for querying Rivanna HPC cluster met
 Some things you can do with this MCP:
 
 - What are my current jobs in Rivanna?
-- Stop my job ID 1234567890.
+- Stop my job ID `1234567890`.
 - How much storage have I used in Rivanna?
 - How many cores total are in Rivanna/Afton?
 - How many GPUs are available in the cluster?
 - Tell me about my allocations.
 - Give me the job history for user `mst3k` over the past `N` days.
 - Help me submit a job to Rivanna with specific resources.
-- Run this command on the cluster: ls -al $HOME/projects
+- Run a command on the cluster: i.e. `ls -al $HOME/projects`
 - Show me the 5 largest files in my home directory
 
 ## Architecture
