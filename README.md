@@ -132,11 +132,11 @@ First, install globally and run the setup:
 npm install -g github:uvads/rivanna-mcp && rivanna-mcp setup
 ```
 
-Then choose your client below:
+Then choose your client below. Install the MCP again in separate projects:
 
 #### Claude Code
 ```bash
-claude mcp add rivanna-mcp -- npx -y rivanna-mcp
+claude mcp add rivanna-mcp -- rivanna-mcp
 ```
 
 #### Codex
